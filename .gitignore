@@ -1,4 +1,6 @@
+# ═══════════════════════════════════════════════════════════════════════
 # Python
+# ═══════════════════════════════════════════════════════════════════════
 __pycache__/
 *.py[cod]
 *$py.class
@@ -9,33 +11,143 @@ dist/
 build/
 eggs/
 *.whl
+.pytest_cache/
+.coverage
+coverage.xml
+*.cover
+htmlcov/
 
-# Virtual environments
+# ═══════════════════════════════════════════════════════════════════════
+# Virtual Environments
+# ═══════════════════════════════════════════════════════════════════════
 .venv/
 venv/
 ENV/
+env/
+.virtualenv/
 
-# IDE
+# ═══════════════════════════════════════════════════════════════════════
+# IDE / Editor
+# ═══════════════════════════════════════════════════════════════════════
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+.project
+.pydevproject
+.settings/
 
-# Environment variables / secrets
+# ═══════════════════════════════════════════════════════════════════════
+# Environment Variables / Secrets (CRITICAL - NEVER COMMIT!)
+# ═══════════════════════════════════════════════════════════════════════
 .env
 .env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+secrets.yaml
+secrets.json
+credentials.json
+service-account.json
+*-credentials.json
+.secret
+.secrets
 
-# OS files
+# API Keys (explicit patterns)
+*apikey*
+*api_key*
+*api-key*
+*secret-key*
+
+# ═══════════════════════════════════════════════════════════════════════
+# Redis / Cache
+# ═══════════════════════════════════════════════════════════════════════
+dump.rdb
+redis.conf
+*.rdb
+*.aof
+.cache/
+
+# ═══════════════════════════════════════════════════════════════════════
+# Logs
+# ═══════════════════════════════════════════════════════════════════════
+*.log
+*.log.*
+logs/
+log/
+*.out
+*.err
+
+# ═══════════════════════════════════════════════════════════════════════
+# OS Files
+# ═══════════════════════════════════════════════════════════════════════
 Thumbs.db
 Desktop.ini
 .DS_Store
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+*.stackdump
 
-# Logs
-*.log
-
+# ═══════════════════════════════════════════════════════════════════════
 # Jupyter
+# ═══════════════════════════════════════════════════════════════════════
 .ipynb_checkpoints/
+*.ipynb_checkpoints
 
-# Distribution / packaging
+# ═══════════════════════════════════════════════════════════════════════
+# Distribution / Packaging
+# ═══════════════════════════════════════════════════════════════════════
 *.tar.gz
 *.zip
+*.7z
+*.rar
+
+# ═══════════════════════════════════════════════════════════════════════
+# Database Files (if any)
+# ═══════════════════════════════════════════════════════════════════════
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# ═══════════════════════════════════════════════════════════════════════
+# Temporary Files
+# ═══════════════════════════════════════════════════════════════════════
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+.temp/
+temp/
+tmp/
+
+# ═══════════════════════════════════════════════════════════════════════
+# Docker (if using Docker)
+# ═══════════════════════════════════════════════════════════════════════
+.dockerignore
+docker-compose.override.yml
+
+# ═══════════════════════════════════════════════════════════════════════
+# LLM Orchestrator Specific
+# ═══════════════════════════════════════════════════════════════════════
+# Local orchestrator configs with secrets
+orchestrator.local.yaml
+config.local.yaml
+*.local.yaml
+*.local.json
+
+# Test outputs
+test_output/
+test_results/
+
+# Cached model responses (if caching to disk)
+.llm_cache/
+cache/
+.model_cache/

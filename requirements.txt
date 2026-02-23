@@ -1,0 +1,53 @@
+# OpenSentinel Dependencies
+
+# ========================================
+# CORE (Required)
+# ========================================
+langchain>=0.1.0
+langchain-anthropic>=0.1.0
+langchain-core>=0.1.0
+deepagents>=0.1.0
+python-dotenv>=1.0.0
+
+# ========================================
+# WEB SEARCH (Choose at least one)
+# ========================================
+tavily-python>=0.3.0          # Primary (recommended) - requires API key
+duckduckgo-search>=4.0.0      # Fallback (free, no API key)
+
+# ========================================
+# OPTIONAL: Enhanced Features
+# ========================================
+
+# Weather APIs
+# requests>=2.31.0            # For OpenWeatherMap/WeatherAPI
+
+# News & Research
+# newsapi-python>=0.2.7       # For NewsAPI
+
+# Finance
+# yfinance>=0.2.0             # Yahoo Finance (free, no API key)
+# alpha-vantage>=2.3.0        # Alpha Vantage API
+
+# Food & Recipes
+# spoonacular>=3.0.0          # Spoonacular API
+
+# Web Scraping (for browse_webpage, extract_article_text)
+# requests>=2.31.0
+# beautifulsoup4>=4.12.0
+# newspaper3k>=0.2.8          # Article extraction
+# trafilatura>=1.6.0          # Alternative article extraction
+
+# Document Processing
+# pypdf>=3.17.0               # PDF reading
+# python-docx>=1.0.0          # Word documents
+
+# System Monitoring
+# psutil>=5.9.0               # System metrics (CPU, memory, disk)
+
+# ========================================
+# DEVELOPMENT (Optional)
+# ========================================
+# pytest>=7.4.0               # Testing
+# black>=23.0.0               # Code formatting
+# flake8>=6.0.0               # Linting
