@@ -1,41 +1,17 @@
 """
-Subagents module — LLM-driven specialist agents for personal productivity and life management.
+Subagents module — Configuration-based subagents for DeepAgents architecture.
 
-Each subagent is a create_react_agent with access to relevant tools.
-Subagents use reasoning to decide which tools to call and how to synthesize results.
-Use subagents for open-ended tasks requiring judgment; use skills for deterministic pipelines.
+With DeepAgents, subagents are defined as configuration dictionaries in agent.py,
+not as pre-instantiated create_react_agent instances. This module is kept for
+organizational purposes and potential future extensions.
+
+Subagent configurations include:
+- Personal Planning: scheduling_coordinator, email_triage_specialist, task_strategist, daily_briefing_compiler
+- Research & Knowledge: research_analyst, report_generator
+- Life Management: weather_advisor, culinary_advisor, travel_coordinator
+- Safety: approval_gatekeeper
+
+All subagent configurations are defined in ../agent.py:create_subagent_configs()
 """
 
-# Personal Planning & Productivity
-from .scheduling_coordinator import delegate_to_scheduling_coordinator
-from .email_triage_specialist import delegate_to_email_triage_specialist
-from .approval_gatekeeper import delegate_to_approval_gatekeeper
-from .task_strategist import delegate_to_task_strategist
-from .daily_briefing_compiler import delegate_to_daily_briefing_compiler
-
-# Research & Knowledge
-from .research_assistant import delegate_to_research_assistant
-from .general_researcher import delegate_to_general_researcher
-from .report_generator import delegate_to_report_generator
-
-# Life Management
-from .weather_advisor import delegate_to_weather_advisor
-from .culinary_advisor import delegate_to_culinary_advisor
-from .travel_coordinator import delegate_to_travel_coordinator
-
-__all__ = [
-    # Personal Planning
-    "delegate_to_scheduling_coordinator",
-    "delegate_to_email_triage_specialist",
-    "delegate_to_approval_gatekeeper",
-    "delegate_to_task_strategist",
-    "delegate_to_daily_briefing_compiler",
-    # Research & Knowledge
-    "delegate_to_research_assistant",
-    "delegate_to_general_researcher",
-    "delegate_to_report_generator",
-    # Life Management
-    "delegate_to_weather_advisor",
-    "delegate_to_culinary_advisor",
-    "delegate_to_travel_coordinator",
-]
+__all__ = []

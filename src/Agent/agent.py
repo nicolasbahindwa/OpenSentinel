@@ -45,6 +45,10 @@ from .tools import (
     create_approval_card,
     log_action,
     validate_safe_automation,
+    check_file_permission,
+    request_directory_access,
+    list_current_permissions,
+    redact_pii,
     get_system_metrics,
     monitor_app_usage,
     check_device_health,
@@ -146,11 +150,13 @@ def create_subagent_configs() -> list[dict[str, Any]]:
             "Return structured recommendations with reasoning."
         ),
         "tools": [
+            connect_calendar,
             fetch_calendar_events,
             create_calendar_event,
             update_calendar_event,
             detect_calendar_conflicts,
             suggest_focus_blocks,
+            fetch_tasks,
         ],
         # Uses parent agent's model if not specified
     }
@@ -164,6 +170,7 @@ def create_subagent_configs() -> list[dict[str, Any]]:
             "and content urgency. Return a structured triage report."
         ),
         "tools": [
+            connect_email,
             fetch_emails,
             classify_email_intent,
             extract_action_items,
@@ -193,13 +200,16 @@ def create_subagent_configs() -> list[dict[str, Any]]:
         "description": "Compiles daily briefings from calendar, weather, tasks, and news. Use for morning briefings.",
         "system_prompt": load_skill("daily-briefing") or (
             "You are a daily briefing specialist. Compile information from multiple sources "
-            "(calendar, weather, tasks, news) into a concise, actionable morning briefing. "
+            "(calendar, weather, tasks, news, messages) into a concise, actionable morning briefing. "
             "Prioritize by urgency and impact. Use markdown formatting."
         ),
         "tools": [
             fetch_calendar_events,
             get_current_weather,
+            get_weather_forecast,
             fetch_tasks,
+            fetch_messages,
+            classify_message_urgency,
             search_news,
             generate_summary,
         ],
@@ -221,9 +231,12 @@ def create_subagent_configs() -> list[dict[str, Any]]:
             get_market_summary,
             search_research_papers,
             get_political_summary,
+            search_web,
             search_internet,
+            browse_webpage,
             extract_article_text,
             generate_summary,
+            create_recommendation,
         ],
     }
     
@@ -236,10 +249,12 @@ def create_subagent_configs() -> list[dict[str, Any]]:
             "Use markdown formatting for clarity."
         ),
         "tools": [
+            list_documents,
+            read_document,
+            search_documents,
+            cite_document,
             generate_summary,
             create_recommendation,
-            cite_document,
-            read_document,
         ],
     }
     
@@ -302,14 +317,18 @@ def create_subagent_configs() -> list[dict[str, Any]]:
         "description": "Reviews critical actions requiring human approval. Use for sensitive operations.",
         "system_prompt": load_skill("approval-workflow") or (
             "You are a safety reviewer. Analyze actions for potential risks, verify safety constraints, "
-            "and prepare approval requests with clear risk/benefit analysis. Never proceed without explicit approval "
-            "for destructive or high-impact operations."
+            "check permissions, and prepare approval requests with clear risk/benefit analysis. Never proceed without explicit approval "
+            "for destructive or high-impact operations. Always verify file permissions before sensitive operations."
         ),
         "tools": [
             detect_critical_action,
             create_approval_card,
             validate_safe_automation,
             log_action,
+            check_file_permission,
+            request_directory_access,
+            list_current_permissions,
+            redact_pii,
         ],
     }
     
@@ -368,11 +387,15 @@ def create_agent(
         fetch_tasks,
         suggest_task_schedule,
         sync_external_tasks,
-        # Safety
+        # Safety & Permissions
         detect_critical_action,
         create_approval_card,
         log_action,
         validate_safe_automation,
+        check_file_permission,
+        request_directory_access,
+        list_current_permissions,
+        redact_pii,
         # System
         get_system_metrics,
         monitor_app_usage,
