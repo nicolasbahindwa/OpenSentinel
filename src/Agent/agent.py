@@ -163,7 +163,7 @@ def create_subagent_configs() -> list[dict[str, Any]]:
     
     email_triage_specialist = {
         "name": "email_triage_specialist",
-        "description": "Classifies emails, extracts action items, and drafts responses. Use for inbox processing.",
+        "description": "Classifies emails, extracts action items, drafts and sends responses. Use for inbox processing.",
         "system_prompt": load_skill("email-triage") or (
             "You are an email management specialist. Classify emails by urgency and intent, "
             "extract actionable tasks, and draft appropriate replies. Prioritize based on sender importance "
@@ -175,29 +175,32 @@ def create_subagent_configs() -> list[dict[str, Any]]:
             classify_email_intent,
             extract_action_items,
             draft_email_reply,
+            send_email,
             create_task,
         ],
     }
     
     task_strategist = {
         "name": "task_strategist",
-        "description": "Analyzes task lists and suggests prioritization strategies. Use for task management.",
+        "description": "Analyzes task lists, suggests prioritization strategies, and syncs with external tools. Use for task management.",
         "system_prompt": (
             "You are a productivity strategist. Analyze task lists, suggest prioritization frameworks "
             "(Eisenhower matrix, energy-based scheduling), and identify task dependencies. "
-            "Consider deadlines, energy levels, and context switching costs."
+            "Consider deadlines, energy levels, and context switching costs. "
+            "Sync tasks with external task managers when requested."
         ),
         "tools": [
             fetch_tasks,
             create_task,
             update_task,
             suggest_task_schedule,
+            sync_external_tasks,
         ],
     }
     
     daily_briefing_compiler = {
         "name": "daily_briefing_compiler",
-        "description": "Compiles daily briefings from calendar, weather, tasks, and news. Use for morning briefings.",
+        "description": "Compiles daily briefings from calendar, weather, tasks, news, and messages. Use for morning briefings.",
         "system_prompt": load_skill("daily-briefing") or (
             "You are a daily briefing specialist. Compile information from multiple sources "
             "(calendar, weather, tasks, news, messages) into a concise, actionable morning briefing. "
@@ -208,8 +211,10 @@ def create_subagent_configs() -> list[dict[str, Any]]:
             get_current_weather,
             get_weather_forecast,
             fetch_tasks,
+            connect_messenger,
             fetch_messages,
             classify_message_urgency,
+            draft_message_reply,
             search_news,
             generate_summary,
         ],
@@ -222,7 +227,7 @@ def create_subagent_configs() -> list[dict[str, Any]]:
         "system_prompt": (
             "You are a research analyst. Conduct thorough research using multiple sources, "
             "verify facts, analyze trends, and synthesize findings into structured reports. "
-            "Always cite sources and indicate confidence levels."
+            "Always cite sources and indicate confidence levels. Monitor websites for changes when tracking ongoing stories."
         ),
         "tools": [
             search_news,
@@ -235,6 +240,7 @@ def create_subagent_configs() -> list[dict[str, Any]]:
             search_internet,
             browse_webpage,
             extract_article_text,
+            monitor_website_changes,
             generate_summary,
             create_recommendation,
         ],
@@ -311,6 +317,23 @@ def create_subagent_configs() -> list[dict[str, Any]]:
         ],
     }
     
+    # System Health Subagent
+    system_monitor = {
+        "name": "system_monitor",
+        "description": "Monitors device health, tracks app usage, and suggests system optimizations. Use for system diagnostics.",
+        "system_prompt": (
+            "You are a system health specialist. Monitor CPU, memory, disk, and battery metrics. "
+            "Track application usage patterns. Identify performance bottlenecks and suggest optimizations. "
+            "Present findings in a clear, actionable format."
+        ),
+        "tools": [
+            get_system_metrics,
+            monitor_app_usage,
+            check_device_health,
+            suggest_system_optimization,
+        ],
+    }
+
     # Safety Subagent
     approval_gatekeeper = {
         "name": "approval_gatekeeper",
@@ -342,6 +365,7 @@ def create_subagent_configs() -> list[dict[str, Any]]:
         weather_advisor,
         culinary_advisor,
         travel_coordinator,
+        system_monitor,
         approval_gatekeeper,
     ]
 
@@ -353,99 +377,34 @@ def create_agent(
 ) -> Any:
     """
     Create the OpenSentinel orchestrator agent.
-    
+
+    The supervisor does NOT receive domain-specific tools. Those belong
+    exclusively to the subagents defined in create_subagent_configs().
+
+    deepagents middleware automatically provides the supervisor with:
+      - write_todos  → planning and task decomposition
+      - task()       → delegation to named subagents
+      - filesystem   → read_file, write_file, edit_file, ls, glob, grep
+
+    Custom tools on the supervisor are limited to cross-cutting concerns
+    that don't belong to any single subagent (e.g. audit logging).
+
     Args:
         llm: Pre-configured LLM instance (orchestrator default is used if None)
         prompt_mode: System prompt complexity ("minimal", "standard", "full")
         enable_human_in_the_loop: Whether to require approval for sensitive operations
-    
+
     Returns:
         Configured deep agent instance
     """
-    
+
     model = llm if llm is not None else create_llm()
-    
-    # All atomic tools available to agent
+
+    # Supervisor gets only cross-cutting tools that aren't owned by a subagent.
+    # All domain-specific tools are delegated via subagent configs.
+    # deepagents middleware injects: write_todos, task(), and filesystem ops.
     tools = [
-        # Calendar
-        connect_calendar,
-        fetch_calendar_events,
-        create_calendar_event,
-        update_calendar_event,
-        suggest_focus_blocks,
-        detect_calendar_conflicts,
-        # Email
-        connect_email,
-        fetch_emails,
-        classify_email_intent,
-        extract_action_items,
-        draft_email_reply,
-        send_email,
-        # Tasks
-        create_task,
-        update_task,
-        fetch_tasks,
-        suggest_task_schedule,
-        sync_external_tasks,
-        # Safety & Permissions
-        detect_critical_action,
-        create_approval_card,
         log_action,
-        validate_safe_automation,
-        check_file_permission,
-        request_directory_access,
-        list_current_permissions,
-        redact_pii,
-        # System
-        get_system_metrics,
-        monitor_app_usage,
-        check_device_health,
-        suggest_system_optimization,
-        # Documents
-        list_documents,
-        read_document,
-        search_documents,
-        cite_document,
-        # Messaging
-        connect_messenger,
-        fetch_messages,
-        classify_message_urgency,
-        draft_message_reply,
-        # Weather
-        get_current_weather,
-        get_weather_forecast,
-        get_hourly_forecast,
-        detect_weather_alerts,
-        check_precipitation_forecast,
-        compare_weather_change,
-        # Research
-        search_news,
-        get_financial_data,
-        analyze_trend,
-        get_market_summary,
-        search_research_papers,
-        get_political_summary,
-        # Culinary
-        search_recipes,
-        get_recipe_details,
-        get_cooking_tips,
-        find_ingredient_stores,
-        suggest_ingredient_substitutes,
-        # Transport
-        search_flights,
-        search_trains,
-        search_buses,
-        get_live_transit_status,
-        check_flight_status,
-        compare_transport_options,
-        # Web
-        browse_webpage,
-        search_internet,
-        extract_article_text,
-        monitor_website_changes,
-        search_web,
-        generate_summary,
-        create_recommendation,
     ]
     
     instructions = load_system_prompt(mode=prompt_mode)
