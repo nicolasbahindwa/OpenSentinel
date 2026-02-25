@@ -21,77 +21,9 @@ from .llm_factory import create_llm
 SKILLS_DIR = Path(__file__).parent / "skills"
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
-# ── LLM Configuration ────────────────────────────────────────────────
 # ── Atomic Tools ─────────────────────────────────────────────────────
-from .tools import (
-    connect_calendar,
-    fetch_calendar_events,
-    create_calendar_event,
-    update_calendar_event,
-    suggest_focus_blocks,
-    detect_calendar_conflicts,
-    connect_email,
-    fetch_emails,
-    classify_email_intent,
-    extract_action_items,
-    draft_email_reply,
-    send_email,
-    create_task,
-    update_task,
-    fetch_tasks,
-    suggest_task_schedule,
-    sync_external_tasks,
-    detect_critical_action,
-    create_approval_card,
-    log_action,
-    validate_safe_automation,
-    check_file_permission,
-    request_directory_access,
-    list_current_permissions,
-    redact_pii,
-    get_system_metrics,
-    monitor_app_usage,
-    check_device_health,
-    suggest_system_optimization,
-    list_documents,
-    read_document,
-    search_documents,
-    cite_document,
-    connect_messenger,
-    fetch_messages,
-    classify_message_urgency,
-    draft_message_reply,
-    get_current_weather,
-    get_weather_forecast,
-    get_hourly_forecast,
-    detect_weather_alerts,
-    check_precipitation_forecast,
-    compare_weather_change,
-    search_news,
-    get_financial_data,
-    analyze_trend,
-    get_market_summary,
-    search_research_papers,
-    get_political_summary,
-    search_recipes,
-    get_recipe_details,
-    get_cooking_tips,
-    find_ingredient_stores,
-    suggest_ingredient_substitutes,
-    search_flights,
-    search_trains,
-    search_buses,
-    get_live_transit_status,
-    check_flight_status,
-    compare_transport_options,
-    browse_webpage,
-    search_internet,
-    extract_article_text,
-    monitor_website_changes,
-    search_web,
-    generate_summary,
-    create_recommendation,
-)
+# Import only the cross-cutting tools needed by the main supervisor agent
+from .tools import log_action
 
 # ── Skill Loading ────────────────────────────────────────────────────
 def load_skill(skill_name: str) -> str:
@@ -135,239 +67,18 @@ def load_system_prompt(mode: str = "standard") -> str:
     return "\n\n---\n\n".join(prompt_parts)
 
 # ── Subagent Configurations ──────────────────────────────────────────
-# Define subagents as CONFIGS (dictionaries), not pre-created agents
+# Import subagent configs from subagents module
+from .subagents import get_all_subagent_configs
+
 
 def create_subagent_configs() -> list[dict[str, Any]]:
-    """Create subagent configuration dictionaries for create_deep_agent."""
-    
-    # Personal Planning Subagents
-    scheduling_coordinator = {
-        "name": "scheduling_coordinator",
-        "description": "Optimizes calendar layouts, resolves conflicts, and suggests focus blocks. Use for complex scheduling decisions.",
-        "system_prompt": load_skill("smart-scheduling") or (
-            "You are a scheduling specialist. Analyze calendars, suggest optimal meeting times, "
-            "resolve conflicts, and create focus blocks. Always check for conflicts before creating events. "
-            "Return structured recommendations with reasoning."
-        ),
-        "tools": [
-            connect_calendar,
-            fetch_calendar_events,
-            create_calendar_event,
-            update_calendar_event,
-            detect_calendar_conflicts,
-            suggest_focus_blocks,
-            fetch_tasks,
-        ],
-        # Uses parent agent's model if not specified
-    }
-    
-    email_triage_specialist = {
-        "name": "email_triage_specialist",
-        "description": "Classifies emails, extracts action items, drafts and sends responses. Use for inbox processing.",
-        "system_prompt": load_skill("email-triage") or (
-            "You are an email management specialist. Classify emails by urgency and intent, "
-            "extract actionable tasks, and draft appropriate replies. Prioritize based on sender importance "
-            "and content urgency. Return a structured triage report."
-        ),
-        "tools": [
-            connect_email,
-            fetch_emails,
-            classify_email_intent,
-            extract_action_items,
-            draft_email_reply,
-            send_email,
-            create_task,
-        ],
-    }
-    
-    task_strategist = {
-        "name": "task_strategist",
-        "description": "Analyzes task lists, suggests prioritization strategies, and syncs with external tools. Use for task management.",
-        "system_prompt": (
-            "You are a productivity strategist. Analyze task lists, suggest prioritization frameworks "
-            "(Eisenhower matrix, energy-based scheduling), and identify task dependencies. "
-            "Consider deadlines, energy levels, and context switching costs. "
-            "Sync tasks with external task managers when requested."
-        ),
-        "tools": [
-            fetch_tasks,
-            create_task,
-            update_task,
-            suggest_task_schedule,
-            sync_external_tasks,
-        ],
-    }
-    
-    daily_briefing_compiler = {
-        "name": "daily_briefing_compiler",
-        "description": "Compiles daily briefings from calendar, weather, tasks, news, and messages. Use for morning briefings.",
-        "system_prompt": load_skill("daily-briefing") or (
-            "You are a daily briefing specialist. Compile information from multiple sources "
-            "(calendar, weather, tasks, news, messages) into a concise, actionable morning briefing. "
-            "Prioritize by urgency and impact. Use markdown formatting."
-        ),
-        "tools": [
-            fetch_calendar_events,
-            get_current_weather,
-            get_weather_forecast,
-            fetch_tasks,
-            connect_messenger,
-            fetch_messages,
-            classify_message_urgency,
-            draft_message_reply,
-            search_news,
-            generate_summary,
-        ],
-    }
-    
-    # Research & Knowledge Subagents
-    research_analyst = {
-        "name": "research_analyst",
-        "description": "Deep research on finance, tech, science, or politics. Use for comprehensive research tasks.",
-        "system_prompt": (
-            "You are a research analyst. Conduct thorough research using multiple sources, "
-            "verify facts, analyze trends, and synthesize findings into structured reports. "
-            "Always cite sources and indicate confidence levels. Monitor websites for changes when tracking ongoing stories."
-        ),
-        "tools": [
-            search_news,
-            get_financial_data,
-            analyze_trend,
-            get_market_summary,
-            search_research_papers,
-            get_political_summary,
-            search_web,
-            search_internet,
-            browse_webpage,
-            extract_article_text,
-            monitor_website_changes,
-            generate_summary,
-            create_recommendation,
-        ],
-    }
-    
-    report_generator = {
-        "name": "report_generator",
-        "description": "Compiles data into formatted reports. Use for creating summaries and briefings.",
-        "system_prompt": (
-            "You are a report writing specialist. Compile information into well-structured, "
-            "readable reports with executive summaries, key findings, and actionable recommendations. "
-            "Use markdown formatting for clarity."
-        ),
-        "tools": [
-            list_documents,
-            read_document,
-            search_documents,
-            cite_document,
-            generate_summary,
-            create_recommendation,
-        ],
-    }
-    
-    # Life Management Subagents
-    weather_advisor = {
-        "name": "weather_advisor",
-        "description": "Analyzes weather patterns and suggests preparations. Use for weather-related planning.",
-        "system_prompt": (
-            "You are a weather planning specialist. Analyze forecasts, detect alerts, and suggest "
-            "preparations for weather conditions. Consider travel impacts, outdoor activities, and safety."
-        ),
-        "tools": [
-            get_current_weather,
-            get_weather_forecast,
-            get_hourly_forecast,
-            detect_weather_alerts,
-            check_precipitation_forecast,
-            compare_weather_change,
-        ],
-    }
-    
-    culinary_advisor = {
-        "name": "culinary_advisor",
-        "description": "Recipe suggestions, cooking tips, and ingredient sourcing. Use for meal planning.",
-        "system_prompt": (
-            "You are a culinary assistant. Suggest recipes based on preferences/dietary restrictions, "
-            "provide cooking tips, find ingredient sources, and suggest substitutions. "
-            "Consider nutrition, prep time, and skill level."
-        ),
-        "tools": [
-            search_recipes,
-            get_recipe_details,
-            get_cooking_tips,
-            find_ingredient_stores,
-            suggest_ingredient_substitutes,
-        ],
-    }
-    
-    travel_coordinator = {
-        "name": "travel_coordinator",
-        "description": "Coordinates flights, trains, buses, and transit. Use for travel planning.",
-        "system_prompt": (
-            "You are a travel planning specialist. Search and compare transport options, "
-            "check live status, and coordinate multi-leg journeys. Optimize for cost, time, and convenience. "
-            "Alert about delays or disruptions."
-        ),
-        "tools": [
-            search_flights,
-            search_trains,
-            search_buses,
-            get_live_transit_status,
-            check_flight_status,
-            compare_transport_options,
-        ],
-    }
-    
-    # System Health Subagent
-    system_monitor = {
-        "name": "system_monitor",
-        "description": "Monitors device health, tracks app usage, and suggests system optimizations. Use for system diagnostics.",
-        "system_prompt": (
-            "You are a system health specialist. Monitor CPU, memory, disk, and battery metrics. "
-            "Track application usage patterns. Identify performance bottlenecks and suggest optimizations. "
-            "Present findings in a clear, actionable format."
-        ),
-        "tools": [
-            get_system_metrics,
-            monitor_app_usage,
-            check_device_health,
-            suggest_system_optimization,
-        ],
-    }
+    """
+    Get subagent configuration dictionaries for create_deep_agent.
 
-    # Safety Subagent
-    approval_gatekeeper = {
-        "name": "approval_gatekeeper",
-        "description": "Reviews critical actions requiring human approval. Use for sensitive operations.",
-        "system_prompt": load_skill("approval-workflow") or (
-            "You are a safety reviewer. Analyze actions for potential risks, verify safety constraints, "
-            "check permissions, and prepare approval requests with clear risk/benefit analysis. Never proceed without explicit approval "
-            "for destructive or high-impact operations. Always verify file permissions before sensitive operations."
-        ),
-        "tools": [
-            detect_critical_action,
-            create_approval_card,
-            validate_safe_automation,
-            log_action,
-            check_file_permission,
-            request_directory_access,
-            list_current_permissions,
-            redact_pii,
-        ],
-    }
-    
-    return [
-        scheduling_coordinator,
-        email_triage_specialist,
-        task_strategist,
-        daily_briefing_compiler,
-        research_analyst,
-        report_generator,
-        weather_advisor,
-        culinary_advisor,
-        travel_coordinator,
-        system_monitor,
-        approval_gatekeeper,
-    ]
+    All subagent configurations are defined in individual files in the subagents/ directory.
+    This function imports and returns them as a list.
+    """
+    return get_all_subagent_configs()
 
 # ── Agent Factory ────────────────────────────────────────────────────
 def create_agent(
@@ -407,9 +118,9 @@ def create_agent(
         log_action,
     ]
     
-    instructions = load_system_prompt(mode=prompt_mode)
+    system_prompt = load_system_prompt(mode=prompt_mode)
     subagents = create_subagent_configs()
-    
+
     # Human-in-the-loop configuration using interrupt_on
     interrupt_on = {}
     if enable_human_in_the_loop:
@@ -419,13 +130,13 @@ def create_agent(
             "update_calendar_event": True,
             "delete_file": {"allowed_decisions": ["approve", "reject"]},  # Custom restrictions
         }
-    
+
     # Required checkpointer for HITL
     checkpointer = MemorySaver()
-    
+
     agent = create_deep_agent(
         tools=tools,
-        instructions=instructions,
+        system_prompt=system_prompt,
         model=model,
         subagents=subagents,  # List of config dicts, not pre-created agents
         interrupt_on=interrupt_on if enable_human_in_the_loop else None,
