@@ -85,7 +85,7 @@ def main():
         print("=" * 60)
 
         # Test query
-        test_query = "What can you help me with today?"
+        test_query = "What's the weather like tomorrow in tokyo and should I bring an umbrella"
 
         print(f"\nQuery: {test_query}\n")
 

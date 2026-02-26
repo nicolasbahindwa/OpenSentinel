@@ -13,6 +13,7 @@ from typing import Any, List, Tuple
 from langchain.chat_models import init_chat_model
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_nvidia_ai_endpoints import ChatNVIDIA
 
 
 def _split_model_candidates(model_spec: str) -> List[str]:
@@ -57,6 +58,13 @@ def _create_single_model(model_spec: str, temperature: float, max_tokens: int) -
     if model.startswith("google/") or model.startswith("gemini"):
         return ChatGoogleGenerativeAI(
             model=model.replace("google/", ""),
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+
+    if model.startswith("nvidia/") or model.startswith("meta/") or model.startswith("mistralai/") or model.startswith("moonshotai/") or model.startswith("qwen/"):
+        return ChatNVIDIA(
+            model=model,
             temperature=temperature,
             max_tokens=max_tokens,
         )
