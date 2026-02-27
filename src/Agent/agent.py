@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from deepagents import create_deep_agent
+from deepagents.middleware.subagents import SubAgentMiddleware
 from langgraph.checkpoint.memory import MemorySaver
 from .llm_factory import create_llm
 
@@ -138,7 +139,9 @@ def create_agent(
         tools=tools,
         system_prompt=system_prompt,
         model=model,
-        subagents=subagents,  # List of config dicts, not pre-created agents
+        middleware=[
+            SubAgentMiddleware(subagents=subagents),
+        ],
         interrupt_on=interrupt_on if enable_human_in_the_loop else None,
         checkpointer=checkpointer,
     )
