@@ -1,127 +1,15 @@
 """
-Web Search Tools — Internet information retrieval using Tavily (primary) and DuckDuckGo (fallback).
+Web Search Tools — Internet information retrieval using Tavily + DuckDuckGo together.
+
+Both providers run in parallel. If one fails, the other still returns results.
+Results are merged and deduplicated. Shared engine lives in _search_engine.py.
 """
 
 from langchain_core.tools import tool
 import json
 from datetime import datetime
-import os
-from typing import Optional
 
-
-def _search_with_tavily(query: str, num_results: int = 5) -> Optional[dict]:
-    """
-    Search using Tavily API (primary method).
-
-    Returns None if Tavily is not available or fails.
-    """
-    try:
-        from tavily import TavilyClient
-
-        # Get API key from environment
-        api_key = os.getenv("TAVILY_API_KEY")
-        if not api_key:
-            return None
-
-        # Initialize Tavily client
-        client = TavilyClient(api_key=api_key)
-
-        # Perform search
-        response = client.search(
-            query=query,
-            max_results=num_results,
-            search_depth="basic",  # or "advanced" for deeper search
-            include_answer=True,  # Get AI-generated answer
-            include_raw_content=False,
-        )
-
-        # Format results
-        results = []
-        for item in response.get("results", []):
-            results.append({
-                "title": item.get("title", ""),
-                "url": item.get("url", ""),
-                "snippet": item.get("content", ""),
-                "score": item.get("score", 0),
-            })
-
-        return {
-            "query": query,
-            "results": results,
-            "answer": response.get("answer", ""),  # AI-generated summary
-            "total_found": len(results),
-            "search_time_ms": response.get("response_time", 0) * 1000,
-            "timestamp": datetime.now().isoformat(),
-            "source": "tavily",
-        }
-
-    except ImportError:
-        # Tavily not installed
-        return None
-    except Exception as e:
-        # Tavily failed
-        print(f"Tavily search failed: {e}")
-        return None
-
-
-def _search_with_duckduckgo(query: str, num_results: int = 5) -> dict:
-    """
-    Search using DuckDuckGo (fallback method).
-
-    Always returns results (even if empty).
-    """
-    try:
-        from duckduckgo_search import DDGS
-
-        # Perform search
-        with DDGS() as ddgs:
-            results_raw = list(ddgs.text(query, max_results=num_results))
-
-        # Format results
-        results = []
-        for item in results_raw:
-            results.append({
-                "title": item.get("title", ""),
-                "url": item.get("href", ""),
-                "snippet": item.get("body", ""),
-            })
-
-        return {
-            "query": query,
-            "results": results,
-            "total_found": len(results),
-            "search_time_ms": 0,
-            "timestamp": datetime.now().isoformat(),
-            "source": "duckduckgo",
-        }
-
-    except ImportError:
-        # DuckDuckGo not installed - return simulated data
-        return {
-            "query": query,
-            "results": [
-                {
-                    "title": f"Search result for: {query}",
-                    "url": "https://example.com",
-                    "snippet": f"Information about {query} (simulated - install duckduckgo-search)",
-                }
-            ],
-            "total_found": 1,
-            "search_time_ms": 0,
-            "timestamp": datetime.now().isoformat(),
-            "source": "simulated",
-            "note": "Install tavily-python or duckduckgo-search for real results",
-        }
-    except Exception as e:
-        # DuckDuckGo failed - return error
-        return {
-            "query": query,
-            "results": [],
-            "total_found": 0,
-            "timestamp": datetime.now().isoformat(),
-            "source": "error",
-            "error": str(e),
-        }
+from ._search_engine import search_dual
 
 
 @tool
@@ -129,30 +17,21 @@ def search_web(query: str, num_results: int = 5) -> str:
     """
     Search the web for information on any topic.
 
-    Uses Tavily API (primary) with DuckDuckGo fallback.
+    Runs both Tavily and DuckDuckGo together for comprehensive coverage.
+    If one provider fails, the other still returns results gracefully.
 
-    Setup:
-    1. For Tavily (recommended): Set TAVILY_API_KEY env variable
-       Get free key at: https://tavily.com
-       Install: pip install tavily-python
-
-    2. For DuckDuckGo (fallback):
-       Install: pip install duckduckgo-search
+    Setup (at least one required):
+    1. Tavily (recommended): Set TAVILY_API_KEY, pip install tavily-python
+    2. DuckDuckGo (free): pip install duckduckgo-search
 
     Args:
         query: The search query (e.g., "latest AI trends 2026")
-        num_results: Number of results to return (1-10)
+        num_results: Number of results per provider (1-10, total may be higher after merge)
 
     Returns:
-        JSON string containing search results with URLs and snippets
+        JSON string with merged results from both providers, deduplicated by URL
     """
-    # Try Tavily first
-    result = _search_with_tavily(query, num_results)
-
-    # Fallback to DuckDuckGo if Tavily unavailable
-    if result is None:
-        result = _search_with_duckduckgo(query, num_results)
-
+    result = search_dual(query, num_results, search_type="general")
     return json.dumps(result, indent=2)
 
 

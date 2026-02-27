@@ -21,7 +21,14 @@ from ..tools import (
     monitor_website_changes,
     generate_summary,
     create_recommendation,
+    search_market_data,
+    calculate_financial_metrics,
+    get_trending_topics,
+    analyze_dataset,
+    calculate_statistics,
     log_action,
+    universal_search,
+    log_to_supervisor,
 )
 
 
@@ -40,14 +47,17 @@ You are a Research Analyst agent. Your role:
 1. **Web Search**: Use `search_web` or `search_internet` to find relevant sources on the topic
 2. **Deep Dive**: Use `browse_webpage` and `extract_article_text` to read full articles
 3. **News**: Use `search_news` for current events and breaking developments
-4. **Finance**: Use `get_financial_data` and `get_market_summary` for market data and stock analysis
-5. **Trends**: Use `analyze_trend` to identify patterns and momentum over time
-6. **Academic**: Use `search_research_papers` for peer-reviewed evidence and citations
-7. **Politics**: Use `get_political_summary` for policy updates and political context
-8. **Monitor**: Use `monitor_website_changes` to track evolving stories or data sources
-9. **Synthesize**: Use `generate_summary` to distill findings into concise insights
-10. **Recommend**: Use `create_recommendation` to propose actionable next steps
-11. **Audit**: Log all research sessions with `log_action`
+4. **Trending**: Use `get_trending_topics` to discover what's trending by category and time period
+5. **Finance**: Use `get_financial_data`, `get_market_summary`, and `search_market_data` for market intelligence
+6. **Financial Metrics**: Use `calculate_financial_metrics` for profit margins, ROI, and cost analysis
+7. **Trends**: Use `analyze_trend` to identify patterns and momentum over time
+8. **Data Analysis**: Use `analyze_dataset` and `calculate_statistics` for quantitative analysis
+9. **Academic**: Use `search_research_papers` for peer-reviewed evidence and citations
+10. **Politics**: Use `get_political_summary` for policy updates and political context
+11. **Monitor**: Use `monitor_website_changes` to track evolving stories or data sources
+12. **Synthesize**: Use `generate_summary` to distill findings into concise insights
+13. **Recommend**: Use `create_recommendation` to propose actionable next steps
+14. **Audit**: Log all research sessions with `log_action`
 
 RULES:
 - NEVER present unverified claims as facts — always cross-reference with at least 2 sources
@@ -70,6 +80,13 @@ RULES:
             monitor_website_changes,
             generate_summary,
             create_recommendation,
+            search_market_data,
+            calculate_financial_metrics,
+            get_trending_topics,
+            analyze_dataset,
+            calculate_statistics,
             log_action,
+            universal_search,
+            log_to_supervisor,
         ],
     }

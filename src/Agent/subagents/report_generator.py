@@ -13,8 +13,12 @@ from ..tools import (
     search_documents,
     cite_document,
     generate_summary,
+    generate_report_summary,
     create_recommendation,
+    validate_data_quality,
     log_action,
+    universal_search,
+    log_to_supervisor,
 )
 
 
@@ -34,9 +38,11 @@ You are a Report Generator agent. Your role:
 2. **Search**: Use `search_documents` to find relevant content across indexed documents
 3. **Read**: Use `read_document` to extract and summarize content from specific files
 4. **Cite**: Use `cite_document` to create proper citations with file paths and excerpts
-5. **Summarize**: Use `generate_summary` to distill large documents into key takeaways
-6. **Recommend**: Use `create_recommendation` to propose actions based on document analysis
-7. **Audit**: Log all report generation with `log_action`
+5. **Validate**: Use `validate_data_quality` to check data integrity before including in reports
+6. **Summarize**: Use `generate_summary` to distill large documents into key takeaways
+7. **Compile**: Use `generate_report_summary` to produce structured report sections from findings
+8. **Recommend**: Use `create_recommendation` to propose actions based on document analysis
+9. **Audit**: Log all report generation with `log_action`
 
 OUTPUT FORMAT:
 ```
@@ -70,7 +76,11 @@ RULES:
             search_documents,
             cite_document,
             generate_summary,
+            generate_report_summary,
             create_recommendation,
+            validate_data_quality,
             log_action,
+            universal_search,
+            log_to_supervisor,
         ],
     }

@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any
 
 from deepagents import create_deep_agent
-from deepagents.middleware.subagents import SubAgentMiddleware
 from langgraph.checkpoint.memory import MemorySaver
 from .llm_factory import create_llm
 
@@ -23,7 +22,7 @@ SKILLS_DIR = Path(__file__).parent / "skills"
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 # ── Atomic Tools ─────────────────────────────────────────────────────
-# Import only the cross-cutting tools needed by the main supervisor agent
+# Import cross-cutting tools for the supervisor
 from .tools import log_action
 
 # ── Skill Loading ────────────────────────────────────────────────────
@@ -123,13 +122,26 @@ def create_agent(
     subagents = create_subagent_configs()
 
     # Human-in-the-loop configuration using interrupt_on
+    # Tool names must match @tool function names exactly (case-sensitive)
+    # Formats: True = full HITL (approve/edit/reject)
+    #          {"allowed_decisions": [...]} = restricted decisions
     interrupt_on = {}
     if enable_human_in_the_loop:
         interrupt_on = {
-            "send_email": True,  # Full HITL (approve/edit/reject)
+            # Communication — always require approval before sending
+            "send_email": True,
+
+            # Calendar — approve before modifying commitments
             "create_calendar_event": True,
             "update_calendar_event": True,
-            "delete_file": {"allowed_decisions": ["approve", "reject"]},  # Custom restrictions
+
+            # Filesystem — Deep Agents built-in tools
+            "write_file": True,
+            "edit_file": True,
+            "delete_file": {"allowed_decisions": ["approve", "reject"]},
+
+            # Safety — approve-only for critical action escalation
+            "detect_critical_action": {"allowed_decisions": ["approve"]},
         }
 
     # Required checkpointer for HITL
@@ -139,9 +151,7 @@ def create_agent(
         tools=tools,
         system_prompt=system_prompt,
         model=model,
-        middleware=[
-            SubAgentMiddleware(subagents=subagents),
-        ],
+        subagents=subagents,
         interrupt_on=interrupt_on if enable_human_in_the_loop else None,
         checkpointer=checkpointer,
     )

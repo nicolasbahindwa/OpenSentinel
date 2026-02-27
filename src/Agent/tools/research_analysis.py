@@ -6,50 +6,30 @@ from langchain_core.tools import tool
 import json
 from datetime import datetime
 
+from ._search_engine import search_dual
+
 
 @tool
 def search_news(query: str, category: str = "general", max_results: int = 10) -> str:
     """
     Search latest news articles on any topic.
 
+    Runs both Tavily and DuckDuckGo together with search_type="news"
+    for comprehensive news coverage. If one provider fails, the other
+    still returns results gracefully.
+
     Args:
-        query: Search query (e.g., "AI developments", "stock market")
-        category: News category (general, business, technology, politics, science, health)
-        max_results: Number of articles to return (1-50)
+        query: Search query (e.g., "AI developments", "DR Congo news")
+        category: News category hint — appended to query for better results
+                  (general, business, technology, politics, science, health)
+        max_results: Number of results per provider (1-50)
 
     Returns:
-        News articles with titles, summaries, sources, publication dates
+        News articles with titles, URLs, snippets, and provider status
     """
-    # Simulated — replace with NewsAPI, Google News API, or RSS feeds
-    sample_articles = [
-        {
-            "title": f"{query}: Latest Developments",
-            "source": "TechNews",
-            "published": "2026-02-21T08:00:00",
-            "summary": f"Recent updates on {query}...",
-            "url": "https://example.com/article1",
-            "category": category,
-        },
-        {
-            "title": f"Analysis: Impact of {query}",
-            "source": "Business Insider",
-            "published": "2026-02-20T15:30:00",
-            "summary": f"Expert analysis on {query}...",
-            "url": "https://example.com/article2",
-            "category": category,
-        },
-    ]
-
-    return json.dumps(
-        {
-            "query": query,
-            "category": category,
-            "articles": sample_articles[:max_results],
-            "total_found": len(sample_articles),
-            "note": "Simulated news — connect to NewsAPI in production",
-        },
-        indent=2,
-    )
+    search_query = f"{query} {category} news" if category != "general" else query
+    result = search_dual(search_query, max_results, search_type="news")
+    return json.dumps(result, indent=2)
 
 
 @tool

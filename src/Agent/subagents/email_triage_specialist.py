@@ -16,6 +16,8 @@ from ..tools import (
     send_email,
     create_task,
     log_action,
+    universal_search,
+    log_to_supervisor,
 )
 
 
@@ -54,5 +56,7 @@ RULES:
             send_email,
             create_task,
             log_action,
+            universal_search,
+            log_to_supervisor,
         ],
     }

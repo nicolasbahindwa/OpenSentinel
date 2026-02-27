@@ -15,6 +15,8 @@ from ..tools import (
     check_flight_status,
     compare_transport_options,
     log_action,
+    universal_search,
+    log_to_supervisor,
 )
 
 
@@ -54,5 +56,7 @@ RULES:
             check_flight_status,
             compare_transport_options,
             log_action,
+            universal_search,
+            log_to_supervisor,
         ],
     }

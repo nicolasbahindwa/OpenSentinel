@@ -142,6 +142,9 @@ from .web_browser import (
 from .web_search import search_web, get_trending_topics
 from .content_generation import generate_summary, create_recommendation
 
+# Universal (shared by all subagents via default_tools)
+from .universal import universal_search, log_to_supervisor
+
 __all__ = [
     # Calendar & Scheduling
     "connect_calendar",
@@ -229,4 +232,7 @@ __all__ = [
     "get_trending_topics",
     "generate_summary",
     "create_recommendation",
+    # Universal
+    "universal_search",
+    "log_to_supervisor",
 ]

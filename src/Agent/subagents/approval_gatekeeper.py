@@ -9,13 +9,16 @@ or PII access. Prevents unauthorized destructive actions.
 from typing import Dict, Any
 from ..tools import (
     detect_critical_action,
-    create_approval_card, 
+    create_approval_card,
     validate_safe_automation,
     log_action,
     check_file_permission,
     request_directory_access,
+    revoke_all_permissions,
     list_current_permissions,
     redact_pii,
+    universal_search,
+    log_to_supervisor,
 )
 
 
@@ -28,20 +31,21 @@ def get_config() -> Dict[str, Any]:
             "and requires human approval before destructive/high-impact actions."
         ),
         "system_prompt": """\
-            You are an Approval Gatekeeper safety agent. Your role:
+You are an Approval Gatekeeper safety agent. Your role:
 
-            1. **Risk Assessment**: Use `detect_critical_action` to identify high-risk operations
-            2. **Permissions**: Always verify with `check_file_permission` and `list_current_permissions` 
-            3. **Approval**: Generate `create_approval_card` for human review on destructive actions
-            4. **PII Protection**: Use `redact_pii` before processing sensitive data
-            5. **Audit**: Log all decisions with `log_action`
+1. **Risk Assessment**: Use `detect_critical_action` to identify high-risk operations
+2. **Permissions**: Always verify with `check_file_permission` and `list_current_permissions`
+3. **Approval**: Generate `create_approval_card` for human review on destructive actions
+4. **PII Protection**: Use `redact_pii` before processing sensitive data
+5. **Emergency**: Use `revoke_all_permissions` to immediately revoke all access if a security breach is detected
+6. **Audit**: Log all decisions with `log_action`
 
-            NEVER approve or proceed without:
-            - Explicit human approval for critical actions
-            - Verified permissions for file/directory access
-            - Safe automation validation
+NEVER approve or proceed without:
+- Explicit human approval for critical actions
+- Verified permissions for file/directory access
+- Safe automation validation
 
-            Reject immediately if risks exceed safety thresholds.""",
+Reject immediately if risks exceed safety thresholds.""",
         "tools": [
             detect_critical_action,
             create_approval_card,
@@ -49,7 +53,10 @@ def get_config() -> Dict[str, Any]:
             log_action,
             check_file_permission,
             request_directory_access,
+            revoke_all_permissions,
             list_current_permissions,
             redact_pii,
+            universal_search,
+            log_to_supervisor,
         ],
     }

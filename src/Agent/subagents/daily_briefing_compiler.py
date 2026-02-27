@@ -19,6 +19,8 @@ from ..tools import (
     draft_message_reply,
     connect_messenger,
     log_action,
+    universal_search,
+    log_to_supervisor,
 )
 
 
@@ -83,5 +85,7 @@ RULES:
             draft_message_reply,
             connect_messenger,
             log_action,
+            universal_search,
+            log_to_supervisor,
         ],
     }

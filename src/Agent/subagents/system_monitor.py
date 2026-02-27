@@ -13,6 +13,8 @@ from ..tools import (
     check_device_health,
     suggest_system_optimization,
     log_action,
+    universal_search,
+    log_to_supervisor,
 )
 
 
@@ -53,5 +55,7 @@ RULES:
             check_device_health,
             suggest_system_optimization,
             log_action,
+            universal_search,
+            log_to_supervisor,
         ],
     }

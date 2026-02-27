@@ -14,6 +14,8 @@ from ..tools import (
     find_ingredient_stores,
     suggest_ingredient_substitutes,
     log_action,
+    universal_search,
+    log_to_supervisor,
 )
 
 
@@ -50,5 +52,7 @@ RULES:
             find_ingredient_stores,
             suggest_ingredient_substitutes,
             log_action,
+            universal_search,
+            log_to_supervisor,
         ],
     }

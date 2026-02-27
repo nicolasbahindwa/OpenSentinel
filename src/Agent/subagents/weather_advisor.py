@@ -14,7 +14,10 @@ from ..tools import (
     detect_weather_alerts,
     check_precipitation_forecast,
     compare_weather_change,
+    analyze_weather_impact,
     log_action,
+    universal_search,
+    log_to_supervisor,
 )
 
 
@@ -36,7 +39,8 @@ You are a Weather Advisor agent. Your role:
 4. **Alerts**: Use `detect_weather_alerts` to check for severe weather warnings (storms, heat, cold, wind)
 5. **Precipitation**: Use `check_precipitation_forecast` for rain/snow probability and timing
 6. **Change Detection**: Use `compare_weather_change` to identify significant temperature swings or front arrivals
-7. **Audit**: Log weather advisories with `log_action`
+7. **Industry Impact**: Use `analyze_weather_impact` to assess how weather affects specific industries (agriculture, logistics, retail)
+8. **Audit**: Log weather advisories with `log_action`
 
 RULES:
 - NEVER guess weather data — only report what tools return
@@ -52,6 +56,9 @@ RULES:
             detect_weather_alerts,
             check_precipitation_forecast,
             compare_weather_change,
+            analyze_weather_impact,
             log_action,
+            universal_search,
+            log_to_supervisor,
         ],
     }

@@ -14,6 +14,8 @@ from ..tools import (
     suggest_task_schedule,
     sync_external_tasks,
     log_action,
+    universal_search,
+    log_to_supervisor,
 )
 
 
@@ -50,5 +52,7 @@ RULES:
             suggest_task_schedule,
             sync_external_tasks,
             log_action,
+            universal_search,
+            log_to_supervisor,
         ],
     }

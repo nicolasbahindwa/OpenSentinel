@@ -1,10 +1,16 @@
 """
-Web Browsing Tools — Advanced internet search and content extraction
+Web Browsing Tools — Advanced internet search and content extraction.
+
+search_internet uses the shared dual-provider engine (Tavily + DuckDuckGo).
+browse_webpage, extract_article_text, and monitor_website_changes are
+content extraction tools (simulated — implement with real libraries in production).
 """
 
 from langchain_core.tools import tool
 import json
 from datetime import datetime
+
+from ._search_engine import search_dual
 
 
 @tool
@@ -44,119 +50,22 @@ def search_internet(query: str, search_type: str = "general", max_results: int =
     """
     Advanced internet search with filtering options.
 
-    Uses Tavily API (primary) with DuckDuckGo fallback.
+    Runs both Tavily and DuckDuckGo together for comprehensive coverage.
+    If one provider fails, the other still returns results gracefully.
 
-    Setup:
-    1. For Tavily (recommended): Set TAVILY_API_KEY env variable
-    2. For DuckDuckGo (fallback): pip install duckduckgo-search
+    Setup (at least one required):
+    1. Tavily (recommended): Set TAVILY_API_KEY, pip install tavily-python
+    2. DuckDuckGo (free): pip install duckduckgo-search
 
     Args:
         query: Search query
-        search_type: Type of search (general, news, images, videos, academic, shopping)
-        max_results: Number of results to return (1-50)
+        search_type: Type of search (general, news, images, videos, academic)
+        max_results: Number of results per provider (1-50)
 
     Returns:
-        Search results with URLs, titles, snippets, dates
+        Merged search results from both providers with URLs, titles, snippets
     """
-    import os
-    from typing import Optional
-
-    def _tavily_search(q: str, max_res: int, s_type: str) -> Optional[dict]:
-        try:
-            from tavily import TavilyClient
-            api_key = os.getenv("TAVILY_API_KEY")
-            if not api_key:
-                return None
-
-            client = TavilyClient(api_key=api_key)
-
-            # Map search types to Tavily parameters
-            search_params = {
-                "query": q,
-                "max_results": max_res,
-                "search_depth": "advanced" if s_type == "academic" else "basic",
-                "include_answer": True,
-            }
-
-            # For news, add topic filter
-            if s_type == "news":
-                search_params["topic"] = "news"
-
-            response = client.search(**search_params)
-
-            results = []
-            for item in response.get("results", []):
-                results.append({
-                    "title": item.get("title", ""),
-                    "url": item.get("url", ""),
-                    "snippet": item.get("content", ""),
-                    "domain": item.get("url", "").split("/")[2] if "/" in item.get("url", "") else "",
-                    "score": item.get("score", 0),
-                })
-
-            return {
-                "query": q,
-                "search_type": s_type,
-                "results": results,
-                "answer": response.get("answer", ""),
-                "total_found": len(results),
-                "source": "tavily",
-            }
-        except:
-            return None
-
-    def _duckduckgo_search(q: str, max_res: int, s_type: str) -> dict:
-        try:
-            from duckduckgo_search import DDGS
-            with DDGS() as ddgs:
-                if s_type == "news":
-                    results_raw = list(ddgs.news(q, max_results=max_res))
-                elif s_type == "images":
-                    results_raw = list(ddgs.images(q, max_results=max_res))
-                elif s_type == "videos":
-                    results_raw = list(ddgs.videos(q, max_results=max_res))
-                else:
-                    results_raw = list(ddgs.text(q, max_results=max_res))
-
-            results = []
-            for item in results_raw:
-                results.append({
-                    "title": item.get("title", ""),
-                    "url": item.get("href") or item.get("url", ""),
-                    "snippet": item.get("body") or item.get("description", ""),
-                    "domain": (item.get("href") or item.get("url", "")).split("/")[2] if "/" in str(item.get("href") or item.get("url", "")) else "",
-                    "published": item.get("date", ""),
-                })
-
-            return {
-                "query": q,
-                "search_type": s_type,
-                "results": results,
-                "total_found": len(results),
-                "source": "duckduckgo",
-            }
-        except:
-            return {
-                "query": q,
-                "search_type": s_type,
-                "results": [{
-                    "title": f"Search result for: {q}",
-                    "url": "https://example.com",
-                    "snippet": f"Information about {q} (install duckduckgo-search or set TAVILY_API_KEY)",
-                    "domain": "example.com",
-                }],
-                "total_found": 1,
-                "source": "simulated",
-            }
-
-    # Try Tavily first, fallback to DuckDuckGo
-    result = _tavily_search(query, max_results, search_type)
-    if result is None:
-        result = _duckduckgo_search(query, max_results, search_type)
-
-    result["search_time_ms"] = 0
-    result["timestamp"] = datetime.now().isoformat()
-
+    result = search_dual(query, max_results, search_type)
     return json.dumps(result, indent=2)
 
 

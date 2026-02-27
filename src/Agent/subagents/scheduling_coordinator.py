@@ -16,6 +16,8 @@ from ..tools import (
     suggest_focus_blocks,
     fetch_tasks,
     log_action,
+    universal_search,
+    log_to_supervisor,
 )
 
 
@@ -53,5 +55,7 @@ RULES:
             suggest_focus_blocks,
             fetch_tasks,
             log_action,
+            universal_search,
+            log_to_supervisor,
         ],
     }

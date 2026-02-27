@@ -85,7 +85,7 @@ def main():
         print("=" * 60)
 
         # Test query
-        test_query = "What's the weather like tomorrow in tokyo and should I bring an umbrella"
+        test_query = "what is the news in the DRCONGO today. try to analyse what going on there"
 
         print(f"\nQuery: {test_query}\n")
 
@@ -135,7 +135,7 @@ def test_subagent():
     try:
         agent = create_agent(enable_human_in_the_loop=False)
 
-        test_query = "What's the weather like today and should I bring an umbrella?"
+        test_query = "what do you think will happen in congo this coming week regarding the political situation and the security of the population. try to give me a detailed analysis based on the current news and trends. also, try to give me some recommendations for the population and the government to improve the situation and avoid further deterioration. also, try to give me some insights about the possible future scenarios and their implications for the region and the world. also, try to give me some insights about the possible future scenarios and their implications for the region and the world. also, try to give me some insights about the possible future scenarios and their implications for the region and the world."
         print(f"\nQuery: {test_query}\n")
 
         # Use thread_id configuration
