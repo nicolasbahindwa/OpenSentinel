@@ -1,10 +1,15 @@
 {
-  "graphs": {
-    "opensentinel": "./agent.py:graph"
-  },
-  "env": ".env",
-  "python_version": "3.13",
-  "dependencies": [
-    "."
-  ]
+    "$schema": "https://langgra.ph/schema.json",
+    "dockerfile_lines": [],
+    "image_distro": "wolfi",
+    "api_version": "0.2",
+    "graphs": {
+        "agent": "./agent/agent.py:create_agent"
+    },
+    "env": ".env",
+    "python_version": "3.13",
+    "dependencies": [
+        ".",
+        "pyproject.toml"
+    ]
 }

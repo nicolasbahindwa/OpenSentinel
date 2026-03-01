@@ -24,7 +24,16 @@ class SearchInput(BaseModel):
 
 class TavilySearchTool(BaseTool):
     name: str = "internet_search"
-    description: str = "Search the internet for current, factual information."
+    description: str = (
+        "Search the internet for current, real-time information. "
+        "Use this tool when you need: "
+        "1) Current events, news, or recent developments "
+        "2) Facts, statistics, or data you don't have "
+        "3) Information after January 2025 "
+        "4) Product details, company info, or people "
+        "5) Any user request containing 'search', 'look up', 'find', or 'latest'. "
+        "Returns a summary with cited sources and URLs."
+    )
     args_schema: Type[BaseModel] = SearchInput
     handle_tool_error: bool = True
 
@@ -111,17 +120,4 @@ class TavilySearchTool(BaseTool):
     # Async version (non-blocking)
     # ------------------------------
 
-    async def _arun(
-        self,
-        query: str,
-        max_results: int = 5,
-        search_depth: str = "basic",
-    ) -> str:
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
-            None,
-            self._run,
-            query,
-            max_results,
-            search_depth,
-        )
+  
