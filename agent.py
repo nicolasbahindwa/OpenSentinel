@@ -78,10 +78,26 @@ model = ChatNVIDIA(
 )
 
 # Create backend factory with explicit skills directory
+print("\n" + "="*60)
+print("🔧 BACKEND CONFIGURATION")
+print("="*60)
 backend_factory = composite_backend(skills_dir=SKILLS_DIR)
+print("✅ Backend factory created")
+print("="*60)
 
 # Create the deep agent with skills middleware
 # Conditionally include store parameter based on environment
+print("\n" + "="*60)
+print("🤖 AGENT CONFIGURATION")
+print("="*60)
+print(f"  Model: qwen/qwen3.5-397b-a17b")
+print(f"  Tools: {[search_tool.__class__.__name__]}")
+print(f"  Backend: composite_backend")
+print(f"  Middleware: SkillsMiddleware")
+print(f"    - Backend factory: {backend_factory}")
+print(f"    - Skills sources: {[str(SKILLS_DIR)]}")
+print(f"    - Skills sources exist: {SKILLS_DIR.exists()}")
+
 agent_config = {
     "model": model,
     "tools": [search_tool],
@@ -95,20 +111,53 @@ agent_config = {
     ],
 }
 
+print("✅ Agent config dictionary created")
+print("="*60)
+
 # Only add store for local development
 # LangGraph Cloud will inject its own store automatically
+print("\n" + "="*60)
+print("💾 STORE CONFIGURATION")
+print("="*60)
 if not IS_LANGGRAPH_API:
     agent_config["store"] = store
+    print("✅ Using InMemoryStore (local development)")
+else:
+    print("✅ Using platform-provided store (LangGraph Cloud)")
+print("="*60)
+
+print("\n" + "="*60)
+print("🚀 CREATING DEEP AGENT")
+print("="*60)
+print("Calling create_deep_agent with:")
+for key, value in agent_config.items():
+    if key == "middleware":
+        print(f"  {key}: [SkillsMiddleware]")
+    elif key == "model":
+        print(f"  {key}: ChatNVIDIA")
+    elif key == "backend":
+        print(f"  {key}: <factory function>")
+    else:
+        print(f"  {key}: {value}")
 
 deep_agent = create_deep_agent(**agent_config)
 
+print("✅ Deep agent created successfully!")
+print("="*60)
+
 graph = deep_agent
 
+print("\n" + "="*60)
+print("📊 DEPLOYMENT SUMMARY")
+print("="*60)
 if IS_LANGGRAPH_API:
-    print(f"\n✅ Agent created for LangGraph Cloud deployment")
-    print(f"   - Persistence: LangGraph Cloud (automatic)")
+    print(f"🌐 LangGraph Cloud deployment")
+    print(f"   - Persistence: Platform-provided (PostgreSQL)")
     print(f"   - Skills from: {SKILLS_DIR}")
+    print(f"   - Middleware: SkillsMiddleware active")
 else:
-    print(f"\n✅ Agent created for local development")
-    print(f"   - Persistence: InMemoryStore (local)")
+    print(f"💻 Local development mode")
+    print(f"   - Persistence: InMemoryStore")
     print(f"   - Skills from: {SKILLS_DIR}")
+    print(f"   - Middleware: SkillsMiddleware active")
+print("="*60)
