@@ -48,6 +48,17 @@ else:
 print(f"Skills directory: {SKILLS_DIR}")
 print(f"Skills directory exists: {SKILLS_DIR.exists()}")
 
+# List skills for debugging
+if SKILLS_DIR.exists():
+    skill_folders = [d.name for d in SKILLS_DIR.iterdir() if d.is_dir()]
+    print(f"Found skills: {skill_folders}")
+    for skill_folder in skill_folders:
+        skill_md = SKILLS_DIR / skill_folder / "SKILL.md"
+        if skill_md.exists():
+            # Read first 100 chars to verify YAML frontmatter
+            content_preview = skill_md.read_text(encoding="utf-8")[:100]
+            print(f"  - {skill_folder}/SKILL.md exists, preview: {content_preview[:50]}...")
+
 # System prompt for the main agent
 research_prompt = """You are an expert researcher and life management assistant.
 
@@ -66,8 +77,8 @@ model = ChatNVIDIA(
     api_key=os.environ["NVIDIA_API_KEY"],
 )
 
-# Create backend factory
-backend_factory = composite_backend()
+# Create backend factory with explicit skills directory
+backend_factory = composite_backend(skills_dir=SKILLS_DIR)
 
 # Create the deep agent with skills middleware
 # Conditionally include store parameter based on environment
