@@ -16,8 +16,14 @@ def composite_backend(skills_dir: str | Path | None = None) -> Callable:
 
     if skills_dir is None:
         resolved_skills_dir = Path(__file__).parent.parent / "skills"
+        print("#" * 50)
+        print("No skills_dir provided, defaulting to:", resolved_skills_dir)
+        print("#" * 50)
     else:
         resolved_skills_dir = Path(skills_dir)
+        print("*" * 50)
+        print("skills_dir explicitly provided:", resolved_skills_dir)
+        print("*" * 50)
 
     # Build once so FilesystemBackend initialization does not run inside async request paths.
     skills_backend = FilesystemBackend(
@@ -29,7 +35,7 @@ def composite_backend(skills_dir: str | Path | None = None) -> Callable:
         routes = {
             "/memories/": StoreBackend(runtime, namespace=lambda ctx: ("memories",)),
             "/workspace/": StoreBackend(runtime, namespace=lambda ctx: ("workspace",)),
-            "/skills/": skills_backend,
+            "/skills/": skills_backend,  # FilesystemBackend for skills
         }
 
         return CompositeBackend(
