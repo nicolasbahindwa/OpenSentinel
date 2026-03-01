@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 from dotenv import load_dotenv
 from tavily import TavilyClient
 from deepagents import create_deep_agent
@@ -14,10 +13,6 @@ load_dotenv()
 # Initialize tools
 search_tool = TavilySearchTool()
 tavily_client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
-
-# Get absolute path to skills directory
-PROJECT_ROOT = Path(__file__).parent
-SKILLS_DIR = PROJECT_ROOT / "skills"
 
 # Detect if being loaded by LangGraph API/Cloud
 IS_LANGGRAPH_API = (
@@ -51,6 +46,9 @@ model = ChatNVIDIA(
     api_key=os.environ["NVIDIA_API_KEY"],
 )
 
+# Use relative path to avoid blocking os.getcwd at module import
+SKILLS_DIR = "skills"
+
 # Create backend factory
 backend_factory = composite_backend(skills_dir=SKILLS_DIR)
 
@@ -63,7 +61,7 @@ agent_config = {
     "middleware": [
         SkillsMiddleware(
             backend=backend_factory,
-            sources=[str(SKILLS_DIR)],
+            sources=[SKILLS_DIR],
         )
     ],
 }
