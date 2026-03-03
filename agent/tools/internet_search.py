@@ -120,4 +120,16 @@ class TavilySearchTool(BaseTool):
     # Async version (non-blocking)
     # ------------------------------
 
-  
+    async def _arun(
+        self,
+        query: str,
+        max_results: int = 5,
+        search_depth: str = "basic",
+    ) -> str:
+        """Run Tavily search without blocking the event loop."""
+        return await asyncio.to_thread(
+            self._run,
+            query,
+            max_results,
+            search_depth,
+        )

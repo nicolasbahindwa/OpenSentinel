@@ -2,7 +2,7 @@ from typing import Any
 
 from deepagents.middleware.subagents import SubAgent
 
-from tools import internet_search as web_tools
+from ..tools import internet_search as web_tools
 
 
 FACT_CHECK_SUBAGENT_PROMPT = """You are OpenSentinel's fact-checking specialist.

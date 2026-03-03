@@ -93,7 +93,7 @@ OpenSentinel is a **free, open-source**, privacy-first AI agent that automates d
 
 ## 4. Universal Capabilities (All Free & Open Source)
 
-**All capabilities are available to everyone - no artificial restrictions:**
+**All capabilities are available to everyone - no artificial restrictions:* -ofunxJ_mjMqI0BT1rNJQh-MBL0tJ2XhZSeVoWb93WMARwAXuabJ5agkHKBW3XURP*
 
 | Domain | Features |
 |--------|----------|

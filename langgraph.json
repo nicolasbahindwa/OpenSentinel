@@ -4,7 +4,7 @@
     "image_distro": "wolfi",
     "api_version": "0.2",
     "graphs": {
-        "agent": "./agent/agent.py:create_agent"
+        "agent": "agent.agent:create_agent"
     },
     "env": ".env",
     "python_version": "3.13",
