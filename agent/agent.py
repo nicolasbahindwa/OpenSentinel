@@ -5,12 +5,14 @@ from deepagents.middleware.skills import SkillsMiddleware
 from agent.config import Config
 from agent.backend import composite_backend
 from agent.tools import internet_search as web_tools
+from agent.tools import weather_lookup
 from agent.subagents import build_subagents
 from agent.middleware import (
     GuardrailsMiddleware,
     ObservabilityMiddleware,
     RateLimitMiddleware,
     RoutingMiddleware,
+    SourceCitationMiddleware,
 )
 
 
@@ -25,11 +27,12 @@ def create_agent() -> CompiledStateGraph:
         system_prompt=configurable.base_agent_prompt,
         memory=["./AGENTS.md"],
         backend=composite_backend(),
-        tools=[web_tools],
+        tools=[t for t in [web_tools, weather_lookup] if t is not None],
         subagents=subagent_specs,
         middleware=[
             GuardrailsMiddleware(),
-            RoutingMiddleware(subagent_name="fact_checker"),
+            RoutingMiddleware(),
+            SourceCitationMiddleware(),
             RateLimitMiddleware(),
             ObservabilityMiddleware(),
             SkillsMiddleware(

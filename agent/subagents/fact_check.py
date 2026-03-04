@@ -31,7 +31,14 @@ def build_fact_check_subagent(model: Any) -> SubAgent:
     """Create a focused fact-checking subagent spec."""
     return {
         "name": "fact_checker",
-        "description": "Verifies factual claims using web evidence and returns a verdict with sources.",
+        "description": (
+            "Verifies factual claims using web evidence and returns a verdict with sources. "
+            "Use this agent proactively when: (1) the user asks to verify or fact-check, "
+            "(2) the topic is controversial or politically charged, "
+            "(3) claims involve medical, legal, or financial advice, "
+            "(4) your own search results show conflicting information, or "
+            "(5) the claim has significant real-world consequences if wrong."
+        ),
         "system_prompt": FACT_CHECK_SUBAGENT_PROMPT,
         "model": model,
         "tools": [web_tools],
