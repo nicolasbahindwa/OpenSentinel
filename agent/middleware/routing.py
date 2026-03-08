@@ -1,171 +1,139 @@
+"""Intent-based routing middleware for OpenSentinel."""
+
+from __future__ import annotations
+
 import re
-from typing import Awaitable, Callable
+from typing import Any
 
-from langchain.agents.middleware.types import AgentMiddleware, ModelRequest, ModelResponse
-from langchain_core.messages import SystemMessage
-
-
-# ==============================
-# Default route definitions
-# ==============================
-
-DEFAULT_ROUTES: list[dict] = [
-    {
-        "name": "fact_checker",
-        "patterns": [
-            r"\bfact[- ]?check\b",
-            r"\bverify\b",
-            r"\bis this true\b",
-            r"\bcheck (this|that|claim|rumou?r|news)\b",
-            r"\bdebunk\b",
-            r"\bsource[- ]?check\b",
-        ],
-        "hint": (
-            "Routing hint: delegate to subagent `{name}` using the task tool. "
-            "Pass the exact claim text and required output format."
-        ),
-    },
-    {
-        "name": "weather_advisor",
-        "patterns": [
-            r"\bweather\b",
-            r"\bforecast\b",
-            r"\btemperature\b",
-            r"\brain\b",
-            r"\bumbrella\b",
-            r"\bclimate\b",
-            r"\boutdoor\b.*\b(plan|activit)",
-        ],
-        "hint": (
-            "Routing hint: delegate to subagent `{name}` using the task tool. "
-            "Include the city name (check /memories/user_prefs.txt if not specified)."
-        ),
-    },
-    {
-        "name": "finance_expert",
-        "patterns": [
-            r"\bstock[s]?\b",
-            r"\bmarket[s]?\b",
-            r"\bdollar[- ]?rate\b",
-            r"\bexchange[- ]?rate\b",
-            r"\binvest(ment|ing)?\b",
-            r"\bportfolio\b",
-            r"\bforex\b",
-            r"\bcrypto\b",
-            r"\bticker\b",
-            r"\bbuy[- ]?(stock|shares)\b",
-            r"\bsell[- ]?(stock|shares)\b",
-        ],
-        "hint": (
-            "Routing hint: delegate to subagent `{name}` using the task tool. "
-            "Include specific ticker symbols or forex pairs. "
-            "Check /memories/user_prefs.txt for the user's watchlist."
-        ),
-    },
-    {
-        "name": "news_curator",
-        "patterns": [
-            r"\bnews\b",
-            r"\bheadline[s]?\b",
-            r"\bcurrent[- ]?events?\b",
-            r"\bwhat'?s happening\b",
-        ],
-        "hint": (
-            "Routing hint: delegate to subagent `{name}` using the task tool. "
-            "Specify categories (tech, finance, politics) or check /memories/user_prefs.txt."
-        ),
-    },
-    {
-        "name": "morning_briefing",
-        "patterns": [
-            r"\bgood morning\b",
-            r"\bmorning[- ]?briefing\b",
-            r"\bdaily[- ]?(summary|briefing|update)\b",
-            r"\bstart my day\b",
-            r"\bjust woke up\b",
-            r"\bwhat should I know\b",
-            r"\bbrief me\b",
-            r"\bwhat did I miss\b",
-        ],
-        "hint": (
-            "Routing hint: delegate to subagent `{name}` using the task tool. "
-            "IMPORTANT: First read /memories/user_prefs.txt and pass the user's preferences "
-            "(location, units, watchlist, forex, news_categories) in the task description."
-        ),
-    },
-]
+from langchain.agents.middleware.types import (
+    AgentMiddleware,
+    AgentState,
+    ContextT,
+    ModelRequest,
+    ModelResponse,
+    ResponseT,
+)
+from langchain_core.messages import HumanMessage, SystemMessage
+from typing_extensions import override
 
 
-class RoutingMiddleware(AgentMiddleware):
-    """Adds dynamic routing hints so the main agent delegates when appropriate.
+def _content_to_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        chunks: list[str] = []
+        for block in content:
+            if isinstance(block, str):
+                chunks.append(block)
+                continue
+            if isinstance(block, dict):
+                text = block.get("text")
+                if isinstance(text, str):
+                    chunks.append(text)
+        return "\n".join(chunks)
+    return str(content)
 
-    Supports multiple subagent routes with pattern-based matching.
-    """
 
-    def __init__(self, routes: list[dict] | None = None) -> None:
-        self._routes = []
-        for route in (routes or DEFAULT_ROUTES):
-            self._routes.append({
-                "name": route["name"],
-                "compiled": [re.compile(p, re.IGNORECASE) for p in route["patterns"]],
-                "hint": route["hint"],
-            })
+class RoutingMiddleware(AgentMiddleware[AgentState[ResponseT], ContextT, ResponseT]):
+    """Add lightweight route hints and prioritize relevant tools."""
 
-    @staticmethod
-    def _latest_user_text(request: ModelRequest) -> str:
+    def __init__(self) -> None:
+        super().__init__()
+        self._routes = [
+            (
+                "morning_briefing",
+                re.compile(r"\b(good morning|morning briefing|daily briefing|daily summary)\b", re.I),
+                ["weather_lookup", "internet_search"],
+                "Prefer delegating to morning_briefing when user asks for a daily overview.",
+            ),
+            (
+                "weather",
+                re.compile(r"\b(weather|forecast|temperature|rain|snow|wind|humidity)\b", re.I),
+                ["weather_lookup", "internet_search"],
+                "Prefer weather_advisor for planning-heavy weather requests.",
+            ),
+            (
+                "finance",
+                re.compile(r"\b(stock|stocks|forex|exchange rate|crypto|market|invest)\b", re.I),
+                ["internet_search"],
+                "Prefer finance_expert for market analysis and investment context.",
+            ),
+            (
+                "news",
+                re.compile(r"\b(news|headline|current events|what happened today)\b", re.I),
+                ["internet_search"],
+                "Prefer news_curator for broad news digests.",
+            ),
+            (
+                "fact_check",
+                re.compile(r"\b(fact check|verify|is this true|debunk|evidence)\b", re.I),
+                ["internet_search"],
+                "Prefer fact_checker for claim verification tasks.",
+            ),
+        ]
+
+    def _last_user_text(self, request: ModelRequest[ContextT]) -> str:
         for msg in reversed(request.messages):
-            if getattr(msg, "type", "") == "human":
-                return getattr(msg, "text", "") or ""
+            if isinstance(msg, HumanMessage):
+                return _content_to_text(msg.content).strip()
         return ""
 
-    def _matched_routes(self, text: str) -> list[dict]:
-        """Return all routes whose patterns match the user text."""
-        matched = []
-        for route in self._routes:
-            if any(p.search(text) for p in route["compiled"]):
-                matched.append(route)
-        return matched
+    def _classify(self, text: str) -> tuple[str, list[str], str]:
+        for route, pattern, tools, hint in self._routes:
+            if pattern.search(text):
+                return route, tools, hint
+        return "general", [], "Use normal planning; delegate only when specialization improves quality."
 
-    def _proactive_hint(self) -> str:
-        return (
-            "Proactive verification: For any response containing factual claims, "
-            "you should use internet_search to verify before stating them. "
-            "If you encounter conflicting sources or high-stakes claims (medical, legal, financial), "
-            "delegate to subagent `fact_checker` for thorough verification."
-        )
+    def _reorder_tools(self, tools: list[Any], preferred: list[str]) -> list[Any]:
+        if not preferred:
+            return tools
 
-    def _merge_hint(self, request: ModelRequest, hint: str) -> ModelRequest:
-        existing = request.system_message.text if request.system_message else ""
-        if hint in existing:
-            return request
-        merged = f"{existing}\n\n{hint}".strip()
-        return request.override(system_message=SystemMessage(content=merged))
+        regular = [t for t in tools if not isinstance(t, dict)]
+        provider = [t for t in tools if isinstance(t, dict)]
+        preferred_set = set(preferred)
 
-    def _apply_routing(self, request: ModelRequest, user_text: str) -> ModelRequest:
-        # Always inject proactive verification hint
-        request = self._merge_hint(request, self._proactive_hint())
+        ordered = [t for t in regular if getattr(t, "name", None) in preferred_set]
+        ordered.extend([t for t in regular if getattr(t, "name", None) not in preferred_set])
+        return [*ordered, *provider]
 
-        # Inject specific routing hints for matched patterns
-        for route in self._matched_routes(user_text):
-            hint = route["hint"].format(name=route["name"])
-            request = self._merge_hint(request, hint)
+    def _append_hint(self, system_message: SystemMessage | None, hint: str) -> SystemMessage:
+        route_text = f"\n\n[Routing Hint]\n{hint}\n"
+        if system_message is None:
+            return SystemMessage(content=route_text.strip())
+        existing = system_message.text or ""
+        return SystemMessage(content=f"{existing}{route_text}")
 
-        return request
-
+    @override
     def wrap_model_call(
         self,
-        request: ModelRequest,
-        handler: Callable[[ModelRequest], ModelResponse],
-    ) -> ModelResponse:
-        user_text = self._latest_user_text(request)
-        request = self._apply_routing(request, user_text)
-        return handler(request)
+        request: ModelRequest[ContextT],
+        handler: Any,
+    ) -> ModelResponse[ResponseT]:
+        text = self._last_user_text(request)
+        route, preferred_tools, hint = self._classify(text)
+
+        patched_request = request.override(
+            tools=self._reorder_tools(request.tools, preferred_tools),
+            system_message=self._append_hint(request.system_message, hint),
+            state={**request.state, "route_decision": route},
+        )
+        return handler(patched_request)
 
     async def awrap_model_call(
         self,
-        request: ModelRequest,
-        handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
-    ) -> ModelResponse:
-        user_text = self._latest_user_text(request)
-        request = self._apply_routing(request, user_text)
-        return await handler(request)
+        request: ModelRequest[ContextT],
+        handler: Any,
+    ) -> ModelResponse[ResponseT]:
+        text = self._last_user_text(request)
+        route, preferred_tools, hint = self._classify(text)
+
+        patched_request = request.override(
+            tools=self._reorder_tools(request.tools, preferred_tools),
+            system_message=self._append_hint(request.system_message, hint),
+            state={**request.state, "route_decision": route},
+        )
+        return await handler(patched_request)
+
+
+__all__ = ["RoutingMiddleware"]
+

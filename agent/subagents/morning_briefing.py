@@ -2,8 +2,7 @@ from typing import Any
 
 from deepagents.middleware.subagents import SubAgent
 
-from ..tools import internet_search as web_tools
-from ..tools import weather_lookup as weather_tool
+from ..tools.lazy_loader import get_tool
 
 
 MORNING_BRIEFING_PROMPT = """You are OpenSentinel's morning briefing compiler.
@@ -53,9 +52,13 @@ Output format:
 
 def build_morning_briefing(model: Any) -> SubAgent:
     """Create the morning briefing subagent spec."""
-    tools = [web_tools]
+    tools = []
+    weather_tool = get_tool("weather_lookup")
+    web_tool = get_tool("internet_search")
     if weather_tool is not None:
-        tools.insert(0, weather_tool)
+        tools.append(weather_tool)
+    if web_tool is not None:
+        tools.append(web_tool)
 
     return {
         "name": "morning_briefing",

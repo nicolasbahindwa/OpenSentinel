@@ -2,7 +2,7 @@ from typing import Any
 
 from deepagents.middleware.subagents import SubAgent
 
-from ..tools import internet_search as web_tools
+from ..tools.lazy_loader import get_tool
 
 
 FINANCE_EXPERT_PROMPT = """You are OpenSentinel's finance expert.
@@ -39,6 +39,9 @@ Output format:
 
 def build_finance_expert(model: Any) -> SubAgent:
     """Create the finance expert subagent spec."""
+    web_tool = get_tool("internet_search")
+    tools = [web_tool] if web_tool is not None else []
+
     return {
         "name": "finance_expert",
         "description": (
@@ -48,7 +51,7 @@ def build_finance_expert(model: Any) -> SubAgent:
         ),
         "system_prompt": FINANCE_EXPERT_PROMPT,
         "model": model,
-        "tools": [web_tools],
+        "tools": tools,
     }
 
 

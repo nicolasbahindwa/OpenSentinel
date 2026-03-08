@@ -6,7 +6,6 @@ from typing import Any, Optional
 from dataclasses import dataclass
 from dotenv import load_dotenv
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
-from agent.prompt.system_prompt import SYSTEM_PROMPT
 
 # Load environment variables
 load_dotenv()
@@ -17,7 +16,6 @@ class Config:
     """Agent configuration"""
     base_model: Any
     subagent_model: Any
-    base_agent_prompt: str = "You are a helpful AI assistant."
     tavily_api_key: Optional[str] = None
     nvidia_api_key: Optional[str] = None
 
@@ -58,13 +56,9 @@ class Config:
             if subagent_model_name
             else base_model
         )
-        # Load system prompt from prompt.py
-        system_prompt = SYSTEM_PROMPT
-
         return cls(
             base_model=base_model,
             subagent_model=subagent_model,
-            base_agent_prompt=system_prompt,
             tavily_api_key=tavily_api_key,
             nvidia_api_key=nvidia_api_key,
         )

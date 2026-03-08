@@ -1,6 +1,6 @@
-import os
 import asyncio
-from typing import Optional, Type, ClassVar
+import os
+from typing import ClassVar, Optional, Type
 
 from tavily import TavilyClient
 from pydantic import BaseModel, Field, PrivateAttr
@@ -37,20 +37,22 @@ class TavilySearchTool(BaseTool):
     args_schema: Type[BaseModel] = SearchInput
     handle_tool_error: bool = True
 
-    _client: TavilyClient = PrivateAttr()
+    _api_key: Optional[str] = PrivateAttr(default=None)
     _cache: TTLCache = PrivateAttr()
 
     MAX_CONTENT_CHARS: ClassVar[int] = 500  # prevent token explosion
 
     def __init__(self, api_key: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
+        self._api_key = api_key
+        self._cache = TTLCache(maxsize=300, ttl=1800)  # 30 min cache
 
-        api_key = api_key or os.environ.get("TAVILY_API_KEY")
+    def _get_client(self) -> TavilyClient:
+        """Create Tavily client only when the tool is actually invoked."""
+        api_key = self._api_key or os.environ.get("TAVILY_API_KEY")
         if not api_key:
-            raise ValueError("TAVILY_API_KEY environment variable required")
-
-        self._client = TavilyClient(api_key=api_key)
-        self._cache = TTLCache(maxsize=500, ttl=3600)  # 1 hour cache
+            raise RuntimeError("TAVILY_API_KEY is not configured")
+        return TavilyClient(api_key=api_key)
 
     # ------------------------------
     # Sync version
@@ -69,7 +71,8 @@ class TavilySearchTool(BaseTool):
             return self._cache[cache_key]
 
         try:
-            response = self._client.search(
+            client = self._get_client()
+            response = client.search(
                 query=query,
                 max_results=max_results,
                 search_depth=search_depth,

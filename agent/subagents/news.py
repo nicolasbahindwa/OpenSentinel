@@ -2,7 +2,7 @@ from typing import Any
 
 from deepagents.middleware.subagents import SubAgent
 
-from ..tools import internet_search as web_tools
+from ..tools.lazy_loader import get_tool
 
 
 NEWS_CURATOR_PROMPT = """You are OpenSentinel's news curator.
@@ -33,6 +33,9 @@ Output format:
 
 def build_news_curator(model: Any) -> SubAgent:
     """Create the news curator subagent spec."""
+    web_tool = get_tool("internet_search")
+    tools = [web_tool] if web_tool is not None else []
+
     return {
         "name": "news_curator",
         "description": (
@@ -42,7 +45,7 @@ def build_news_curator(model: Any) -> SubAgent:
         ),
         "system_prompt": NEWS_CURATOR_PROMPT,
         "model": model,
-        "tools": [web_tools],
+        "tools": tools,
     }
 
 

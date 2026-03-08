@@ -1,82 +1,79 @@
-import os
+"""Request rate-limiting middleware for OpenSentinel."""
+
+from __future__ import annotations
+
 import threading
 import time
-from collections import deque
-from typing import Any, Awaitable, Callable
+from collections import defaultdict, deque
+from typing import Any
 
-from langchain.agents.middleware.types import AgentMiddleware, ModelRequest, ModelResponse
-from langchain_core.messages import AIMessage, ToolMessage
-from langgraph.prebuilt.tool_node import ToolCallRequest
-from langgraph.types import Command
+from langchain.agents.middleware.types import (
+    AgentMiddleware,
+    AgentState,
+    ContextT,
+    ResponseT,
+    hook_config,
+)
+from langchain_core.messages import AIMessage
+from typing_extensions import override
 
 
-class RateLimitMiddleware(AgentMiddleware):
-    """Simple in-process sliding-window rate limiting for model and tool calls."""
+class RateLimitMiddleware(AgentMiddleware[AgentState[ResponseT], ContextT, ResponseT]):
+    """Enforce a per-identity request budget in a rolling time window."""
 
-    def __init__(
+    _requests: dict[str, deque[float]] = defaultdict(deque)
+    _lock = threading.Lock()
+
+    def __init__(self, *, max_requests: int = 30, window_seconds: int = 60) -> None:
+        super().__init__()
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+
+    def _identity(self, runtime: Any) -> str:
+        context = getattr(runtime, "context", None)
+        if isinstance(context, dict):
+            for key in ("user_id", "thread_id", "session_id"):
+                value = context.get(key)
+                if value:
+                    return str(value)
+        return "global"
+
+    @hook_config(can_jump_to=["end"])
+    @override
+    def before_model(
         self,
-        model_calls_per_minute: int | None = None,
-        tool_calls_per_minute: int | None = None,
-    ) -> None:
-        self.model_limit = model_calls_per_minute or int(os.getenv("MODEL_CALLS_PER_MINUTE", "60"))
-        self.tool_limit = tool_calls_per_minute or int(os.getenv("TOOL_CALLS_PER_MINUTE", "120"))
-        self.window_seconds = 60.0
-        self._model_hits: deque[float] = deque()
-        self._tool_hits: deque[float] = deque()
-        self._lock = threading.Lock()
+        state: AgentState[ResponseT],
+        runtime: Any,
+    ) -> dict[str, Any] | None:
+        identity = self._identity(runtime)
+        now = time.time()
 
-    def _acquire(self, bucket: deque[float], limit: int) -> bool:
-        now = time.monotonic()
         with self._lock:
-            while bucket and (now - bucket[0]) >= self.window_seconds:
-                bucket.popleft()
-            if len(bucket) >= limit:
-                return False
-            bucket.append(now)
-            return True
+            queue = self._requests[identity]
+            while queue and (now - queue[0]) > self.window_seconds:
+                queue.popleft()
 
-    def wrap_model_call(
-        self,
-        request: ModelRequest,
-        handler: Callable[[ModelRequest], ModelResponse],
-    ) -> ModelResponse | AIMessage:
-        if not self._acquire(self._model_hits, self.model_limit):
-            return AIMessage(content="Rate limit exceeded for model calls. Please retry in a moment.")
-        return handler(request)
+            if len(queue) >= self.max_requests:
+                retry_after = max(1, int(self.window_seconds - (now - queue[0])))
+                msg = AIMessage(
+                    content=(
+                        "Rate limit reached. "
+                        f"Please retry in about {retry_after} seconds."
+                    )
+                )
+                return {"messages": [msg], "jump_to": "end"}
 
-    async def awrap_model_call(
-        self,
-        request: ModelRequest,
-        handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
-    ) -> ModelResponse | AIMessage:
-        if not self._acquire(self._model_hits, self.model_limit):
-            return AIMessage(content="Rate limit exceeded for model calls. Please retry in a moment.")
-        return await handler(request)
+            queue.append(now)
 
-    def wrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], ToolMessage | Command[Any]],
-    ) -> ToolMessage | Command[Any]:
-        if not self._acquire(self._tool_hits, self.tool_limit):
-            return ToolMessage(
-                content="Rate limit exceeded for tool calls. Please retry in a moment.",
-                name=request.tool_call.get("name"),
-                tool_call_id=request.tool_call["id"],
-                status="error",
-            )
-        return handler(request)
+        return None
 
-    async def awrap_tool_call(
+    async def abefore_model(
         self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command[Any]]],
-    ) -> ToolMessage | Command[Any]:
-        if not self._acquire(self._tool_hits, self.tool_limit):
-            return ToolMessage(
-                content="Rate limit exceeded for tool calls. Please retry in a moment.",
-                name=request.tool_call.get("name"),
-                tool_call_id=request.tool_call["id"],
-                status="error",
-            )
-        return await handler(request)
+        state: AgentState[ResponseT],
+        runtime: Any,
+    ) -> dict[str, Any] | None:
+        return self.before_model(state, runtime)
+
+
+__all__ = ["RateLimitMiddleware"]
+

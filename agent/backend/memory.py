@@ -10,6 +10,7 @@ from deepagents.backends import (
 def composite_backend():
     base_dir = os.path.dirname(os.path.dirname(__file__))
     skills_dir = os.path.abspath(os.path.join(base_dir, "skills"))
+    capabilities_dir = os.path.abspath(os.path.join(base_dir, "capabilities"))
         
     def factory(runtime):
         routes = {
@@ -17,6 +18,10 @@ def composite_backend():
             "/workspace/": StoreBackend(runtime),
             "/skills/": FilesystemBackend(
                 root_dir=skills_dir,
+                virtual_mode=True,
+            ),
+            "/capabilities/": FilesystemBackend(
+                root_dir=capabilities_dir,
                 virtual_mode=True,
             ),
         }

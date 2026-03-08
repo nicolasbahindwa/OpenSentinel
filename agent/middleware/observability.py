@@ -1,95 +1,105 @@
+"""Observability middleware for timing and routing telemetry."""
+
+from __future__ import annotations
+
 import logging
 import time
-from typing import Any, Awaitable, Callable
+from typing import Annotated, Any
 
-from langchain.agents.middleware.types import AgentMiddleware, ModelRequest, ModelResponse
-from langchain_core.messages import ToolMessage
-from langgraph.prebuilt.tool_node import ToolCallRequest
-from langgraph.types import Command
-
+from langchain.agents.middleware.types import (
+    AgentMiddleware,
+    AgentState,
+    ContextT,
+    PrivateStateAttr,
+    ResponseT,
+)
+from typing_extensions import NotRequired, TypedDict, override
 
 logger = logging.getLogger("agent.middleware.observability")
 
 
-class ObservabilityMiddleware(AgentMiddleware):
-    """Logs model and tool latency/error events."""
+class ObservabilityState(AgentState[ResponseT], total=False):
+    obs_started_at: Annotated[NotRequired[float], PrivateStateAttr]
+    obs_model_started_at: Annotated[NotRequired[float], PrivateStateAttr]
+    route_decision: NotRequired[str]
 
-    def wrap_model_call(
-        self,
-        request: ModelRequest,
-        handler: Callable[[ModelRequest], ModelResponse],
-    ) -> ModelResponse:
-        start = time.perf_counter()
-        try:
-            response = handler(request)
-            elapsed_ms = int((time.perf_counter() - start) * 1000)
-            logger.info(
-                "model_call_success",
-                extra={
-                    "elapsed_ms": elapsed_ms,
-                    "message_count": len(request.messages),
-                    "tool_count": len(request.tools or []),
-                },
-            )
-            return response
-        except Exception:
-            elapsed_ms = int((time.perf_counter() - start) * 1000)
-            logger.exception("model_call_error", extra={"elapsed_ms": elapsed_ms})
-            raise
 
-    async def awrap_model_call(
-        self,
-        request: ModelRequest,
-        handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
-    ) -> ModelResponse:
-        start = time.perf_counter()
-        try:
-            response = await handler(request)
-            elapsed_ms = int((time.perf_counter() - start) * 1000)
-            logger.info(
-                "model_call_success",
-                extra={
-                    "elapsed_ms": elapsed_ms,
-                    "message_count": len(request.messages),
-                    "tool_count": len(request.tools or []),
-                },
-            )
-            return response
-        except Exception:
-            elapsed_ms = int((time.perf_counter() - start) * 1000)
-            logger.exception("model_call_error", extra={"elapsed_ms": elapsed_ms})
-            raise
+class ObservabilityMiddleware(
+    AgentMiddleware[ObservabilityState, ContextT, ResponseT]
+):
+    """Emit lightweight logs for agent lifecycle and model latency."""
 
-    def wrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], ToolMessage | Command[Any]],
-    ) -> ToolMessage | Command[Any]:
-        start = time.perf_counter()
-        tool_name = request.tool_call.get("name", "unknown_tool")
-        try:
-            result = handler(request)
-            elapsed_ms = int((time.perf_counter() - start) * 1000)
-            logger.info("tool_call_success", extra={"tool": tool_name, "elapsed_ms": elapsed_ms})
-            return result
-        except Exception:
-            elapsed_ms = int((time.perf_counter() - start) * 1000)
-            logger.exception("tool_call_error", extra={"tool": tool_name, "elapsed_ms": elapsed_ms})
-            raise
+    state_schema = ObservabilityState
 
-    async def awrap_tool_call(
+    @override
+    def before_agent(
         self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command[Any]]],
-    ) -> ToolMessage | Command[Any]:
-        start = time.perf_counter()
-        tool_name = request.tool_call.get("name", "unknown_tool")
-        try:
-            result = await handler(request)
-            elapsed_ms = int((time.perf_counter() - start) * 1000)
-            logger.info("tool_call_success", extra={"tool": tool_name, "elapsed_ms": elapsed_ms})
-            return result
-        except Exception:
-            elapsed_ms = int((time.perf_counter() - start) * 1000)
-            logger.exception("tool_call_error", extra={"tool": tool_name, "elapsed_ms": elapsed_ms})
-            raise
+        state: ObservabilityState,
+        runtime: Any,
+    ) -> dict[str, Any] | None:
+        return {"obs_started_at": time.time()}
+
+    async def abefore_agent(
+        self,
+        state: ObservabilityState,
+        runtime: Any,
+    ) -> dict[str, Any] | None:
+        return self.before_agent(state, runtime)
+
+    @override
+    def before_model(
+        self,
+        state: ObservabilityState,
+        runtime: Any,
+    ) -> dict[str, Any] | None:
+        return {"obs_model_started_at": time.time()}
+
+    async def abefore_model(
+        self,
+        state: ObservabilityState,
+        runtime: Any,
+    ) -> dict[str, Any] | None:
+        return self.before_model(state, runtime)
+
+    @override
+    def after_model(
+        self,
+        state: ObservabilityState,
+        runtime: Any,
+    ) -> dict[str, Any] | None:
+        model_start = state.get("obs_model_started_at")
+        if model_start is not None:
+            model_ms = int((time.time() - model_start) * 1000)
+            route = state.get("route_decision", "unknown")
+            logger.info("model_call_completed route=%s latency_ms=%s", route, model_ms)
+        return None
+
+    async def aafter_model(
+        self,
+        state: ObservabilityState,
+        runtime: Any,
+    ) -> dict[str, Any] | None:
+        return self.after_model(state, runtime)
+
+    @override
+    def after_agent(
+        self,
+        state: ObservabilityState,
+        runtime: Any,
+    ) -> dict[str, Any] | None:
+        started_at = state.get("obs_started_at")
+        if started_at is not None:
+            total_ms = int((time.time() - started_at) * 1000)
+            logger.info("agent_turn_completed latency_ms=%s", total_ms)
+        return None
+
+    async def aafter_agent(
+        self,
+        state: ObservabilityState,
+        runtime: Any,
+    ) -> dict[str, Any] | None:
+        return self.after_agent(state, runtime)
+
+
+__all__ = ["ObservabilityMiddleware"]
+

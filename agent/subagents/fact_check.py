@@ -2,7 +2,7 @@ from typing import Any
 
 from deepagents.middleware.subagents import SubAgent
 
-from ..tools import internet_search as web_tools
+from ..tools.lazy_loader import get_tool
 
 
 FACT_CHECK_SUBAGENT_PROMPT = """You are OpenSentinel's fact-checking specialist.
@@ -29,6 +29,9 @@ Output format:
 
 def build_fact_check_subagent(model: Any) -> SubAgent:
     """Create a focused fact-checking subagent spec."""
+    web_tool = get_tool("internet_search")
+    tools = [web_tool] if web_tool is not None else []
+
     return {
         "name": "fact_checker",
         "description": (
@@ -41,7 +44,7 @@ def build_fact_check_subagent(model: Any) -> SubAgent:
         ),
         "system_prompt": FACT_CHECK_SUBAGENT_PROMPT,
         "model": model,
-        "tools": [web_tools],
+        "tools": tools,
     }
 
 
