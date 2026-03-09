@@ -70,6 +70,29 @@ class RoutingMiddleware(AgentMiddleware[AgentState[ResponseT], ContextT, Respons
                 ["internet_search"],
                 "Prefer fact_checker for claim verification tasks.",
             ),
+            (
+                "system_monitoring",
+                re.compile(
+                    r"\b(cpu|ram|memory usage|disk usage|storage|network status"
+                    r"|process(?:es)?|system status|system health|system info"
+                    r"|performance|uptime|load average)\b",
+                    re.I,
+                ),
+                ["system_status"],
+                "Use system_status for read-only system health checks (CPU, RAM, disk, network, processes).",
+            ),
+            (
+                "file_operations",
+                re.compile(
+                    r"\b(file|folder|directory|desktop|documents|downloads"
+                    r"|open file|browse|list files|find files|search files"
+                    r"|create file|create folder|move file|rename file"
+                    r"|read file|edit file|save file|delete file)\b",
+                    re.I,
+                ),
+                ["file_browser"],
+                "Use file_browser for local file operations (list, read, search, create, move, edit).",
+            ),
         ]
 
     def _last_user_text(self, request: ModelRequest[ContextT]) -> str:

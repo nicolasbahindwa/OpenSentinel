@@ -9,6 +9,9 @@ from .lazy_loader import (
 )
 from .weather import WeatherLookupTool
 from .internet_search import TavilySearchTool
+from .file_browser import FileBrowserTool
+from .tool_search import ToolSearchTool
+from .system_monitoring import SystemStatusTool
 
 __all__ = [
     "LazyToolLoader",
@@ -18,5 +21,8 @@ __all__ = [
     "get_all_tools",
     "TavilySearchTool",
     "WeatherLookupTool",
+    "FileBrowserTool",
+    "ToolSearchTool",
+    "SystemStatusTool",
 ]
 

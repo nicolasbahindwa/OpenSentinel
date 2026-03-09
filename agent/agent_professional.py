@@ -17,6 +17,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 from agent.backend import composite_backend
 from agent.config import Config
+from agent.logger import configure_logging, get_logger
 from agent.middleware import (
     GuardrailsMiddleware,
     ObservabilityMiddleware,
@@ -24,15 +25,8 @@ from agent.middleware import (
     RoutingMiddleware,
 )
 from agent.prompt.loader import get_full_prompt
+from agent.registry import get_registry
 
-AVAILABLE_TOOLS = ("internet_search", "weather_lookup")
-AVAILABLE_SUBAGENTS = (
-    "fact_check",
-    "weather",
-    "finance",
-    "news",
-    "morning_briefing",
-)
 SKILL_SOURCES = ("/skills/",)
 
 
@@ -62,7 +56,8 @@ def get_selected_tools(tool_names: Optional[tuple[str, ...]] = None):
     Returns:
         List of materialized tool instances
     """
-    _validate_requested_names(tool_names, AVAILABLE_TOOLS, "tools")
+    registry = get_registry()
+    _validate_requested_names(tool_names, registry.available_names("tool"), "tools")
 
     from agent.tools.lazy_loader import get_all_tools, get_tool
 
@@ -92,7 +87,10 @@ def get_selected_subagents(
     Returns:
         List of materialized subagent instances
     """
-    _validate_requested_names(subagent_names, AVAILABLE_SUBAGENTS, "subagents")
+    registry = get_registry()
+    _validate_requested_names(
+        subagent_names, registry.available_names("subagent"), "subagents"
+    )
 
     from agent.subagents.lazy_loader import LazySubagentLoader
 
@@ -110,6 +108,9 @@ def get_selected_subagents(
     return subagents
 
 
+logger = get_logger("agent.agent", component="agent")
+
+
 @lru_cache(maxsize=1)
 def create_professional_agent(
     tool_names: Optional[tuple[str, ...]] = None,
@@ -120,6 +121,9 @@ def create_professional_agent(
 
     Agent graph creation is deferred and cached: this runs only on first call.
     """
+    configure_logging(json_output=True, log_level="INFO")
+    logger.info("creating_agent", tools=tool_names, subagents=subagent_names)
+
     configurable = Config.from_runnable_config()
 
     tools = get_selected_tools(tool_names)
@@ -134,7 +138,7 @@ def create_professional_agent(
         subagents=subagents,
         skills=list(SKILL_SOURCES),
         middleware=[
-            GuardrailsMiddleware(),
+            GuardrailsMiddleware(judge_model=configurable.judge_model),
             RateLimitMiddleware(max_requests=30, window_seconds=60),
             RoutingMiddleware(),
             ObservabilityMiddleware(),

@@ -17,6 +17,10 @@ from langchain.agents.middleware.types import (
 from langchain_core.messages import AIMessage
 from typing_extensions import override
 
+from agent.logger import get_logger
+
+logger = get_logger("agent.middleware.rate_limit", component="rate_limit")
+
 
 class RateLimitMiddleware(AgentMiddleware[AgentState[ResponseT], ContextT, ResponseT]):
     """Enforce a per-identity request budget in a rolling time window."""
@@ -55,6 +59,11 @@ class RateLimitMiddleware(AgentMiddleware[AgentState[ResponseT], ContextT, Respo
 
             if len(queue) >= self.max_requests:
                 retry_after = max(1, int(self.window_seconds - (now - queue[0])))
+                logger.warning(
+                    "rate_limit_exceeded",
+                    identity=identity,
+                    retry_after_seconds=retry_after,
+                )
                 msg = AIMessage(
                     content=(
                         "Rate limit reached. "

@@ -1,84 +1,54 @@
+"""Lazy tool loader — driven by the central registry.
+
+Tools are only instantiated when first accessed.  The registry is the
+single source of truth for what tools exist; this module handles caching
+and on-demand instantiation via the factory import paths stored there.
 """
-Lazy tool loader - tools are only instantiated when first used
-"""
+
+from __future__ import annotations
+
 from typing import Optional
-from functools import cached_property
+
 from langchain_core.tools import BaseTool
+
+from agent.registry import get_registry
 
 
 class LazyToolLoader:
-    """
-    Lazy loader for tools - instantiates tools only when accessed.
+    """Instantiates tools on demand using registry factory paths."""
 
-    This prevents expensive tool initialization at import time.
-    """
+    def __init__(self) -> None:
+        self._cache: dict[str, BaseTool] = {}
 
-    def __init__(self):
-        self._tools_cache = {}
+    def get_tool(self, name: str) -> Optional[BaseTool]:
+        """Get a tool by name (lazy loaded from registry)."""
+        if name in self._cache:
+            return self._cache[name]
 
-    @cached_property
-    def internet_search(self) -> BaseTool:
-        """Lazy load internet search tool."""
-        if "internet_search" not in self._tools_cache:
-            from .internet_search import TavilySearchTool
-            self._tools_cache["internet_search"] = TavilySearchTool()
+        registry = get_registry()
+        tool = registry.create_tool(name)
+        if tool is not None:
+            self._cache[name] = tool
+        return tool
 
-        return self._tools_cache["internet_search"]
-
-    @cached_property
-    def weather_lookup(self) -> BaseTool:
-        """Lazy load weather lookup tool (no API key required - uses free Open-Meteo API)."""
-        if "weather_lookup" not in self._tools_cache:
-            from .weather import WeatherLookupTool
-
-            # No API key needed - Open-Meteo is free
-            self._tools_cache["weather_lookup"] = WeatherLookupTool()
-
-        return self._tools_cache["weather_lookup"]
-
-    def get_tool(self, tool_name: str) -> Optional[BaseTool]:
-        """
-        Get a tool by name (lazy loaded).
-
-        Args:
-            tool_name: Name of the tool to load
-
-        Returns:
-            Tool instance or None if not found
-        """
-        tool_getter = getattr(self, tool_name, None)
-        if tool_getter:
-            return tool_getter
-        return None
-
-    def get_tools(self, *tool_names: str) -> list[BaseTool]:
-        """
-        Get multiple tools by name.
-
-        Args:
-            *tool_names: Names of tools to load
-
-        Returns:
-            List of tool instances
-        """
+    def get_tools(self, *names: str) -> list[BaseTool]:
+        """Get multiple tools by name."""
         tools = []
-        for name in tool_names:
+        for name in names:
             tool = self.get_tool(name)
             if tool:
                 tools.append(tool)
         return tools
 
     def get_all_tools(self) -> list[BaseTool]:
-        """
-        Get all available tools (lazy loaded on first access).
-
-        Returns:
-            List of all tool instances
-        """
-        return [
-            self.internet_search,
-            self.weather_lookup,
-        ]
+        """Get all registered tools (lazy loaded on first access)."""
+        registry = get_registry()
+        tools = []
+        for entry in registry.list_all(kind="tool"):
+            tool = self.get_tool(entry.name)
+            if tool:
+                tools.append(tool)
+        return tools
 
 
 # Global lazy loader instance
@@ -97,7 +67,7 @@ def get_tools(*tool_names: str) -> list[BaseTool]:
 
 def get_minimal_tools() -> list[BaseTool]:
     """Get minimal toolset for basic operation."""
-    return [_tool_loader.internet_search]
+    return _tool_loader.get_tools("internet_search")
 
 
 def get_all_tools() -> list[BaseTool]:

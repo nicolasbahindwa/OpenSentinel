@@ -1,12 +1,17 @@
 """Weather lookup tool backed by the free Open-Meteo API."""
 
 import asyncio
+import threading
 from typing import ClassVar, Type
 
 import httpx
 from cachetools import TTLCache
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field, PrivateAttr
+
+from agent.logger import get_logger
+
+logger = get_logger("agent.tools.weather", component="weather")
 
 WMO_CODES = {
     0: "Clear sky",
@@ -82,7 +87,11 @@ class WeatherLookupTool(BaseTool):
     name: str = "weather_lookup"
     description: str = (
         "Get current weather and a 3-day forecast for any location using Open-Meteo. "
-        "Use for weather, temperature, and outdoor planning requests."
+        "Use for weather, temperature, and outdoor planning requests.\n\n"
+        "Examples:\n"
+        '- City name: location="Istanbul", units="metric"\n'
+        '- Imperial units: location="New York", units="imperial"\n'
+        '- Default metric: location="Tokyo"'
     )
     args_schema: Type[BaseModel] = WeatherInput
     handle_tool_error: bool = True
@@ -91,10 +100,18 @@ class WeatherLookupTool(BaseTool):
     WEATHER_URL: ClassVar[str] = "https://api.open-meteo.com/v1/forecast"
 
     _cache: TTLCache = PrivateAttr()
+    _cache_lock: threading.RLock = PrivateAttr()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._cache = TTLCache(maxsize=200, ttl=900)  # 15 min cache
+        self._cache_lock = threading.RLock()
+
+    @staticmethod
+    def _normalize_cache_key(location: str, units: str) -> str:
+        """Create a consistent cache key from user input."""
+        normalized_location = " ".join(location.lower().strip().split())
+        return f"{normalized_location}:{units}"
 
     def _geocode(self, client: httpx.Client, location: str) -> dict | None:
         response = client.get(
@@ -120,9 +137,11 @@ class WeatherLookupTool(BaseTool):
         if units not in {"metric", "imperial"}:
             units = "metric"
 
-        cache_key = f"{location}:{units}"
-        if cache_key in self._cache:
-            return self._cache[cache_key]
+        cache_key = self._normalize_cache_key(location, units)
+
+        with self._cache_lock:
+            if cache_key in self._cache:
+                return self._cache[cache_key]
 
         is_imperial = units == "imperial"
         temp_unit = "fahrenheit" if is_imperial else "celsius"
@@ -130,30 +149,42 @@ class WeatherLookupTool(BaseTool):
         temp_symbol = "F" if is_imperial else "C"
         wind_symbol = "mph" if is_imperial else "km/h"
 
-        with httpx.Client(timeout=10.0) as client:
-            place = self._geocode(client, location)
-            if not place:
-                return f"No location found for '{location}'."
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                place = self._geocode(client, location)
+                if not place:
+                    return f"No location found for '{location}'."
 
-            weather_params = {
-                "latitude": place["latitude"],
-                "longitude": place["longitude"],
-                "current": (
-                    "temperature_2m,relative_humidity_2m,weather_code,"
-                    "wind_speed_10m,wind_direction_10m,apparent_temperature,uv_index"
-                ),
-                "daily": "temperature_2m_max,temperature_2m_min,weather_code",
-                "temperature_unit": temp_unit,
-                "wind_speed_unit": wind_unit,
-                "timezone": "auto",
-                "forecast_days": 3,
-            }
-            response = client.get(self.WEATHER_URL, params=weather_params)
-            response.raise_for_status()
-            wx = response.json()
+                weather_params = {
+                    "latitude": place["latitude"],
+                    "longitude": place["longitude"],
+                    "current": (
+                        "temperature_2m,relative_humidity_2m,weather_code,"
+                        "wind_speed_10m,wind_direction_10m,apparent_temperature,uv_index"
+                    ),
+                    "daily": "temperature_2m_max,temperature_2m_min,weather_code",
+                    "temperature_unit": temp_unit,
+                    "wind_speed_unit": wind_unit,
+                    "timezone": "auto",
+                    "forecast_days": 3,
+                }
+                response = client.get(self.WEATHER_URL, params=weather_params)
+                response.raise_for_status()
+                wx = response.json()
+        except Exception as e:
+            logger.error(
+                "weather_api_error",
+                location=location,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
 
         output = self._format_output(place, wx, temp_symbol, wind_symbol)
-        self._cache[cache_key] = output
+
+        with self._cache_lock:
+            self._cache[cache_key] = output
+
         return output
 
     async def _arun(self, location: str, units: str = "metric") -> str:

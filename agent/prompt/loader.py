@@ -67,7 +67,7 @@ class PromptLoader:
 
     def get_full_prompt(self) -> str:
         """Get full prompt with all modules."""
-        return self.build_prompt("tools", "skills", "subagents")
+        return self.build_prompt("safety", "tools", "skills", "subagents")
 
 
 # Global instance for easy access

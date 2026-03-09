@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import time
 from typing import Annotated, Any
 
@@ -15,7 +14,9 @@ from langchain.agents.middleware.types import (
 )
 from typing_extensions import NotRequired, TypedDict, override
 
-logger = logging.getLogger("agent.middleware.observability")
+from agent.logger import get_logger
+
+logger = get_logger("agent.middleware.observability", component="observability")
 
 
 class ObservabilityState(AgentState[ResponseT], total=False):

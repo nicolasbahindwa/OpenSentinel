@@ -7,6 +7,10 @@ from pydantic import BaseModel, Field, PrivateAttr
 from langchain_core.tools import BaseTool
 from cachetools import TTLCache
 
+from agent.logger import get_logger
+
+logger = get_logger("agent.tools.internet_search", component="internet_search")
+
 
 # ==============================
 # Input Schema
@@ -32,7 +36,12 @@ class TavilySearchTool(BaseTool):
         "3) Information after January 2025 "
         "4) Product details, company info, or people "
         "5) Any user request containing 'search', 'look up', 'find', or 'latest'. "
-        "Returns a summary with cited sources and URLs."
+        "Returns a summary with cited sources and URLs.\n\n"
+        "Examples:\n"
+        '- Quick factual lookup: query="population of Japan 2025", max_results=3\n'
+        '- Current events: query="latest AI regulation news", max_results=5, search_depth="basic"\n'
+        '- Deep research: query="comparison of electric vehicle batteries 2025", '
+        'max_results=10, search_depth="advanced"'
     )
     args_schema: Type[BaseModel] = SearchInput
     handle_tool_error: bool = True
@@ -80,6 +89,12 @@ class TavilySearchTool(BaseTool):
                 include_raw_content=False,
             )
         except Exception as e:
+            logger.error(
+                "tavily_api_error",
+                query=query,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             raise RuntimeError(f"Tavily API error: {str(e)}") from e
 
         results = response.get("results", [])
