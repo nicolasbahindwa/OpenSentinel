@@ -12,6 +12,7 @@ from .internet_search import TavilySearchTool
 from .file_browser import FileBrowserTool
 from .tool_search import ToolSearchTool
 from .system_monitoring import SystemStatusTool
+from .web_browser import WebBrowserTool
 
 __all__ = [
     "LazyToolLoader",
@@ -24,5 +25,6 @@ __all__ = [
     "FileBrowserTool",
     "ToolSearchTool",
     "SystemStatusTool",
+    "WebBrowserTool",
 ]
 

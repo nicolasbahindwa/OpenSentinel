@@ -70,9 +70,11 @@ def _decode_common_encodings(text: str) -> list[str]:
     """Attempt to decode common obfuscation encodings."""
     variants = [text]
 
-    # Base64 detection
+    # Base64 detection — minimum 3 groups (12 chars) to catch short payloads
+    # like "cm0gLXJmIC8q" (rm -rf /*) while avoiding false positives on
+    # normal words
     b64_pattern = re.compile(
-        r"(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?"
+        r"(?:[A-Za-z0-9+/]{4}){3,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?"
     )
     for match in b64_pattern.finditer(text):
         try:
@@ -98,6 +100,17 @@ def _decode_common_encodings(text: str) -> list[str]:
 
 class ThreatDetector:
     """Multi-layer regex threat detection."""
+
+    # Layer 0: Token injection — ChatML / special tokens (checked on RAW text)
+    TOKEN_INJECTION: ClassVar[re.Pattern] = re.compile(
+        r"<\|im_(end|start)\|>"
+        r"|<\|system\|>|<\|user\|>|<\|assistant\|>"
+        r"|<\|endoftext\|>|<\|begin_of_text\|>"
+        r"|<\|eot_id\|>|<\|start_header_id\|>"
+        r"|\[INST\]|\[/INST\]"
+        r"|<<SYS>>|<</SYS>>",
+        re.I,
+    )
 
     # Layer 1: Hard-block — no educational override
     HARD_BLOCK: ClassVar[list[re.Pattern]] = [
@@ -159,6 +172,10 @@ class ThreatDetector:
         ),
     ]
 
+    def check_token_injection(self, raw_text: str) -> bool:
+        """Check for ChatML/special token injection on RAW (un-normalized) text."""
+        return bool(self.TOKEN_INJECTION.search(raw_text))
+
     def check_hard_block(self, text: str) -> bool:
         return any(p.search(text) for p in self.HARD_BLOCK)
 
@@ -186,8 +203,28 @@ class ConversationAnalyzer:
         self._cumulative_risk: dict[str, float] = defaultdict(float)
 
     _OVERRIDE_RE = re.compile(
-        r"\b(ignore\s+previous|disregard\s+instructions|forget\s+everything"
-        r"|new\s+instruction|you\s+are\s+now|act\s+as\s+if)\b",
+        r"\b(ignore\s+(previous|all|your|the|my)\s*(instructions|rules|guidelines|policies|restrictions|directives)"
+        r"|disregard\s+(all\s+)?(instructions|rules|guidelines|policies|restrictions)"
+        r"|forget\s+(everything|all|your|previous)"
+        r"|new\s+instruction|you\s+are\s+now|act\s+as\s+if"
+        r"|pretend\s+you\s+are|you\s+must\s+obey|override\s+(all|your|safety|content)"
+        r"|no\s+(restrictions|limitations|rules|filters|policies)"
+        r"|jailbreak|DAN\s+mode|do\s+anything\s+now"
+        r"|system\s+override|admin\s+override)\b",
+        re.I,
+    )
+    # ChatML / special token injection (model-level prompt boundary attack)
+    _TOKEN_INJECTION_RE = re.compile(
+        r"<\|im_(end|start)\|>"         # ChatML tokens
+        r"|<\|system\|>"                 # system role token
+        r"|<\|user\|>"                   # user role token
+        r"|<\|assistant\|>"              # assistant role token
+        r"|<\|endoftext\|>"              # GPT end-of-text
+        r"|\[INST\]|\[/INST\]"          # Llama instruction tokens
+        r"|<<SYS>>|<</SYS>>"            # Llama system tokens
+        r"|<\|begin_of_text\|>"          # Llama 3 BOT
+        r"|<\|eot_id\|>"                # Llama 3 end-of-turn
+        r"|<\|start_header_id\|>",       # Llama 3 header
         re.I,
     )
     _SAFE_FRAMING_RE = re.compile(
@@ -206,6 +243,10 @@ class ConversationAnalyzer:
         # Prompt injection / instruction override
         if self._OVERRIDE_RE.search(text):
             risk_factors.append("instruction_override_attempt")
+
+        # ChatML / special token injection
+        if self._TOKEN_INJECTION_RE.search(text):
+            risk_factors.append("token_injection_attempt")
 
         # Escalation: earlier messages had safe framing, now requesting malicious
         if len(history) >= 2:
@@ -452,6 +493,16 @@ class GuardrailsMiddleware(
         self, raw_text: str, tid: str, variants: list[str]
     ) -> dict[str, Any] | str | None:
         """Run hard-block + contextual regex. Returns refusal dict, 'judge', or None."""
+        # Layer 0: Token injection (on raw text, before normalization strips markers)
+        if self._detector.check_token_injection(raw_text):
+            self._anomaly.record_blocked(tid)
+            logger.warning(
+                "security_token_injection_block",
+                thread_id=tid,
+                input_hash=self._input_hash(raw_text),
+            )
+            return self._refusal(_REFUSAL)
+
         # Layer 1-2: Hard-block (all text variants)
         for variant in variants:
             if self._detector.check_hard_block(variant):

@@ -1,65 +1,53 @@
 # OpenSentinel Dependencies
+# Kept in sync with pyproject.toml
 
 # ========================================
-# CORE (Required)
+# CORE
 # ========================================
-langchain>=0.1.0
-langchain-nvidia-ai-endpoints>=0.3.0
-langchain-anthropic>=0.1.0
-langchain-google-genai>=2.0.0
-langgraph-cli[inmem]
-langgraph-checkpoint-postgres
-psycopg[binary,pool]
-langchain-core>=0.1.0
-deepagents>=0.4.3
+langchain>=1.2.0
+langchain-core>=1.2.0
+langgraph>=1.0.0
+langgraph-sdk>=0.3.0
+langgraph-checkpoint>=3.0.0
+langgraph-cli[inmem]>=0.3.0
+langgraph-checkpoint-postgres>=0.1.0
+psycopg[binary,pool]>=3.0.0
+deepagents>=0.4.4
 python-dotenv>=1.0.0
-openai>=1.0.0
-anthropic>=0.30.0
-httpx>=0.27.0
 pyyaml>=6.0.0
 pydantic>=2.0.0
-cachetools>=5.0.0
+pydantic-settings>=2.0.0
 structlog>=24.0.0
-psutil
-# ========================================
-# WEB SEARCH (Choose at least one)
-# ========================================
-tavily-python>=0.3.0          # Primary (recommended) - requires API key
-duckduckgo-search>=4.0.0      # Fallback (free, no API key)
 
 # ========================================
-# OPTIONAL: Enhanced Features
+# LLM PROVIDERS
 # ========================================
-
-# Weather APIs
-# requests>=2.31.0            # For OpenWeatherMap/WeatherAPI
-
-# News & Research
-# newsapi-python>=0.2.7       # For NewsAPI
-
-# Finance
-# yfinance>=0.2.0             # Yahoo Finance (free, no API key)
-# alpha-vantage>=2.3.0        # Alpha Vantage API
-
-# Food & Recipes
-# spoonacular>=3.0.0          # Spoonacular API
-
-# Web Scraping (for browse_webpage, extract_article_text)
-# requests>=2.31.0
-# beautifulsoup4>=4.12.0
-# newspaper3k>=0.2.8          # Article extraction
-# trafilatura>=1.6.0          # Alternative article extraction
-
-# Document Processing
-# pypdf>=3.17.0               # PDF reading
-# python-docx>=1.0.0          # Word documents
-
-# System Monitoring
-# psutil>=5.9.0               # System metrics (CPU, memory, disk)
+langchain-nvidia-ai-endpoints>=0.3.0
+langchain-anthropic>=1.3.0
+langchain-google-genai>=4.2.0
+openai>=1.0.0
+anthropic>=0.78.0
 
 # ========================================
-# DEVELOPMENT (Optional)
+# TOOLS & APIs
 # ========================================
-# pytest>=7.4.0               # Testing
-# black>=23.0.0               # Code formatting
-# flake8>=6.0.0               # Linting
+tavily-python>=0.7.0              # Internet search (requires API key)
+duckduckgo-search>=4.0.0          # Fallback search (free, no API key)
+httpx>=0.27.0                     # HTTP client for APIs
+cachetools>=5.0.0                 # Tool caching
+psutil>=5.9.0                     # System monitoring
+playwright>=1.40.0                # Web browser automation
+
+# ========================================
+# CUSTOM
+# ========================================
+llm-orchestrator[all] @ git+https://github.com/nicolasbahindwa/LLM_Orchestrator.git@main
+
+# ========================================
+# DEVELOPMENT
+# ========================================
+ruff>=0.6
+black>=24.0
+mypy>=1.8
+isort>=5.13
+pre-commit>=3.6

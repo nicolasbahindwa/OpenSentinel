@@ -249,6 +249,35 @@ def _register_builtins() -> None:
         parameters='category (all|cpu|memory|disk|network|processes|os, default "all"), limit (1-100, default 10)',
     ))
 
+    _registry.register(ToolEntry(
+        name="web_browser",
+        kind="tool",
+        description=(
+            "Browse the web, fetch page content, take snapshots with element refs, "
+            "interact with page elements, search via Brave/DuckDuckGo, and capture screenshots. "
+            "Supports headless browser automation with Playwright."
+        ),
+        category="web",
+        factory="agent.tools.web_browser:WebBrowserTool",
+        keywords=[
+            "browse", "web", "webpage", "url", "fetch", "scrape",
+            "snapshot", "click", "screenshot", "search", "brave",
+            "navigate", "website", "page", "html",
+        ],
+        examples=[
+            'action="fetch", url="https://example.com"',
+            'action="search", query="latest AI news"',
+            'action="snapshot", url="https://example.com"',
+            'action="act", ref="e5", action_type="click"',
+            'action="screenshot", url="https://example.com"',
+        ],
+        parameters=(
+            "action (fetch|browse|search|snapshot|act|screenshot), "
+            "url, query, ref, action_type (click|type|press|hover|select), "
+            "value, mode (headless|headful), search_provider (auto|brave|duckduckgo)"
+        ),
+    ))
+
     # ----- Subagents -----
     # name = loader key (used by agent_professional.py)
     # display_name = SubAgent name (what the model sees via the task tool)

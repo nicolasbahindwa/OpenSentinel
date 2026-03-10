@@ -55,10 +55,10 @@ def composite_backend():
         return _sandbox
 
     def factory(runtime):
-        logger.debug("composite_backend_factory_called")
+        sandbox = _get_sandbox()
         routes = {
             "/memories/": StoreBackend(runtime),
-            "/workspace/": _get_sandbox(),
+            "/workspace/": sandbox,
             "/skills/": FilesystemBackend(
                 root_dir=skills_dir,
                 virtual_mode=True,
@@ -68,6 +68,14 @@ def composite_backend():
                 virtual_mode=True,
             ),
         }
+
+        logger.info(
+            "composite_backend_ready",
+            routes=list(routes.keys()),
+            sandbox_id=sandbox.id,
+            sandbox_workspace=sandbox.get_workspace(),
+            sandbox_allowlist_enabled=sandbox.allowed_commands is not None,
+        )
 
         return CompositeBackend(
             default=StateBackend(runtime),

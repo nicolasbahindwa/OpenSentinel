@@ -38,6 +38,23 @@ Categories:
 - `processes` — top processes by memory usage (set `limit` for count)
 - `os` — operating system and platform info
 
+## `web_browser`
+
+Browse the web, fetch page content, interact with elements, and capture screenshots using Playwright.
+Actions:
+- `fetch` — fetch a URL and return markdown content (lightweight, no JS)
+- `browse` — open a URL in a headless browser (supports JS-heavy pages)
+- `search` — search the web via Brave or DuckDuckGo
+- `snapshot` — take a DOM snapshot with element refs (e.g. `e1`, `e5`)
+- `act` — interact with a snapshot element (click, type, press, hover, select)
+- `screenshot` — capture a PNG screenshot of a page
+
+**Usage notes:**
+- Use `fetch` for simple pages; use `browse` for JS-rendered content.
+- Use `snapshot` + `act` for multi-step interactions (fill forms, click buttons).
+- Provide `ref` from a previous snapshot when using `act`.
+- Set `mode="headful"` only when explicitly needed (default is headless).
+
 ## Tool Policy
 
 - When unsure which tool to use, call `tool_search` first to discover capabilities.

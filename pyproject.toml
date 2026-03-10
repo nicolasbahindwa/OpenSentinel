@@ -34,9 +34,11 @@ dependencies = [
 
     # Tools & APIs
     "tavily-python>=0.7.0",           # Internet search
+    "duckduckgo-search>=4.0.0",       # Fallback search (free, no API key)
     "httpx>=0.27.0",                  # HTTP client for APIs
     "cachetools>=5.0.0",              # Tool caching
     "psutil>=5.9.0",                  # System monitoring
+    "playwright>=1.40.0",             # Web browser automation
 
     # Logging
     "structlog>=24.0.0",
@@ -60,6 +62,9 @@ dependencies = [
     "isort>=5.13",
     "pre-commit>=3.6",
 ]
+
+[project.scripts]
+opensentinel-chat = "gateway.cli:main"
 
 [project.optional-dependencies]
 dev = [

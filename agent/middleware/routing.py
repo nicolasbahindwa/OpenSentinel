@@ -82,6 +82,18 @@ class RoutingMiddleware(AgentMiddleware[AgentState[ResponseT], ContextT, Respons
                 "Use system_status for read-only system health checks (CPU, RAM, disk, network, processes).",
             ),
             (
+                "web_browsing",
+                re.compile(
+                    r"\b(browse\s+(the\s+)?web|visit\s+(this\s+|a\s+)?url|open\s+(this\s+|a\s+)?(web)?page"
+                    r"|navigate\s+to|screenshot|scrape|fetch\s+(this\s+|a\s+)?(page|url|website)"
+                    r"|web\s*page|website\s+content|click\s+(on\s+)?(the\s+)?button"
+                    r"|fill\s+(in\s+|out\s+)?(the\s+)?form)\b",
+                    re.I,
+                ),
+                ["web_browser"],
+                "Use web_browser for fetching URLs, browsing JS-heavy pages, taking snapshots, and interacting with web elements.",
+            ),
+            (
                 "file_operations",
                 re.compile(
                     r"\b(file|folder|directory|desktop|documents|downloads"
