@@ -54,9 +54,26 @@ class RoutingMiddleware(AgentMiddleware[AgentState[ResponseT], ContextT, Respons
             ),
             (
                 "finance",
-                re.compile(r"\b(stock|stocks|forex|exchange rate|crypto|market|invest)\b", re.I),
-                ["internet_search"],
-                "Prefer finance_expert for market analysis and investment context.",
+                re.compile(
+                    r"\b(stock|stocks|share price|ticker|AAPL|MSFT|GOOGL|TSLA"
+                    r"|forex|exchange rate|currency convert"
+                    r"|crypto|bitcoin|ethereum|btc|eth"
+                    r"|market|invest|portfolio|dividend)\b",
+                    re.I,
+                ),
+                ["yahoo_finance", "crypto", "currency", "internet_search"],
+                "Use yahoo_finance for stock quotes and company data, crypto for cryptocurrency data, "
+                "currency for exchange rates and conversion. Prefer finance_expert for analysis.",
+            ),
+            (
+                "email",
+                re.compile(
+                    r"\b(email|gmail|inbox|send email|compose|draft|unread mail"
+                    r"|check mail|read email|mail)\b",
+                    re.I,
+                ),
+                ["gmail"],
+                "Use gmail for email operations (list, search, read, send, draft).",
             ),
             (
                 "news",
@@ -87,11 +104,17 @@ class RoutingMiddleware(AgentMiddleware[AgentState[ResponseT], ContextT, Respons
                     r"\b(browse\s+(the\s+)?web|visit\s+(this\s+|a\s+)?url|open\s+(this\s+|a\s+)?(web)?page"
                     r"|navigate\s+to|screenshot|scrape|fetch\s+(this\s+|a\s+)?(page|url|website)"
                     r"|web\s*page|website\s+content|click\s+(on\s+)?(the\s+)?button"
-                    r"|fill\s+(in\s+|out\s+)?(the\s+)?form)\b",
+                    r"|fill\s+(in\s+|out\s+)?(the\s+)?form"
+                    r"|connect\s+to\s+chrome|cdp|devtools|cookies?\s+(get|clear|manage)"
+                    r"|extract\s+(links|headings|tables|text|metadata|prices)"
+                    r"|stealth\s+mode|anti.?detect"
+                    r"|multiple\s+tabs?|new\s+tab)\b",
                     re.I,
                 ),
                 ["web_browser"],
-                "Use web_browser for fetching URLs, browsing JS-heavy pages, taking snapshots, and interacting with web elements.",
+                "Use web_browser for fetching URLs, browsing JS-heavy pages, snapshots, "
+                "element interaction, CDP connection, multi-tab management, form filling, "
+                "content extraction, cookie management, stealth mode, and page diagnostics.",
             ),
             (
                 "file_operations",

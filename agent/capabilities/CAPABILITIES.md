@@ -5,6 +5,10 @@ Keep startup prompts concise and read this file only when deeper guidance is nee
 
 ## Tools
 
+- `tool_search`
+  - Purpose: discover available tools and subagents from the registry.
+  - Use for: mapping user requests to capabilities when unsure.
+
 - `internet_search`
   - Purpose: real-time web retrieval and source-backed facts.
   - Use for: post-cutoff data, news, prices, and date-sensitive questions.
@@ -12,6 +16,19 @@ Keep startup prompts concise and read this file only when deeper guidance is nee
 - `weather_lookup`
   - Purpose: current weather and 3-day forecast.
   - Use for: weather planning, travel conditions, and briefing summaries.
+
+- `file_browser`
+  - Purpose: browse and manage local files.
+  - Use for: listing, reading, searching, creating, editing, and moving files.
+  - Limits: restricted to Desktop, Documents, and Downloads.
+
+- `system_status`
+  - Purpose: read-only system health checks.
+  - Use for: CPU, memory, disk, network, process, and OS info.
+
+- `web_browser`
+  - Purpose: web browsing, DOM snapshots with element refs, and browser automation.
+  - Use for: JS-heavy pages, multi-step interactions, and screenshots.
 
 ## Subagents
 
@@ -34,9 +51,8 @@ Read a specific `SKILL.md` only when the task requires that workflow.
 - Observability middleware: logs route decisions and latency metrics.
 - Memory middleware: loads configured memory files once per session.
 - Skills middleware: injects skill catalog and enables progressive disclosure.
-- Filesystem middleware: provides file operations for `/memories/`, `/workspace/`, and mapped routes.
+- Filesystem middleware: provides file operations within tool-enforced allowlists.
 
 ## Memory
 
 - `/memories/`: persistent memory and preferences.
-- `/workspace/`: task workspace.

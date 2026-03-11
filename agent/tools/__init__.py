@@ -13,6 +13,10 @@ from .file_browser import FileBrowserTool
 from .tool_search import ToolSearchTool
 from .system_monitoring import SystemStatusTool
 from .web_browser import WebBrowserTool
+from .crypto import CryptoTool
+from .currency import CurrencyTool
+from .yahoo_finance import YahooFinanceTool
+from .gmail import GmailTool
 
 __all__ = [
     "LazyToolLoader",
@@ -26,5 +30,9 @@ __all__ = [
     "ToolSearchTool",
     "SystemStatusTool",
     "WebBrowserTool",
+    "CryptoTool",
+    "CurrencyTool",
+    "YahooFinanceTool",
+    "GmailTool",
 ]
 

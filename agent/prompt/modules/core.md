@@ -23,7 +23,7 @@ You are OpenSentinel, a production assistant built for accurate execution.
 
 - Persistent memory is under `/memories/`.
 - Skills are discovered from `/skills/`.
-- Working files are under `/workspace/`.
+- Working files are under Desktop, Documents, and Downloads (tool-enforced allowlist).
 
 ## Middleware (Runtime)
 

@@ -39,6 +39,10 @@ dependencies = [
     "cachetools>=5.0.0",              # Tool caching
     "psutil>=5.9.0",                  # System monitoring
     "playwright>=1.40.0",             # Web browser automation
+    "yfinance>=0.2.0",                # Yahoo Finance stock data
+    "google-auth>=2.0.0",             # Gmail OAuth2
+    "google-auth-oauthlib>=1.0.0",    # Gmail OAuth2 flow
+    "google-api-python-client>=2.0.0", # Gmail API client
 
     # Logging
     "structlog>=24.0.0",

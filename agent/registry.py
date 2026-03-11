@@ -253,8 +253,11 @@ def _register_builtins() -> None:
         name="web_browser",
         kind="tool",
         description=(
-            "Browse the web, fetch page content, take snapshots with element refs, "
-            "interact with page elements, search via Brave/DuckDuckGo, and capture screenshots. "
+            "Browse the web with multi-session, multi-tab support. "
+            "Fetch page content, take snapshots with element refs, interact with elements, "
+            "search via Brave/DuckDuckGo, capture screenshots. "
+            "Connect to existing Chrome via CDP, manage tabs, fill forms, extract content, "
+            "run JavaScript, handle dialogs, manage cookies, and enable stealth mode. "
             "Supports headless browser automation with Playwright."
         ),
         category="web",
@@ -262,19 +265,135 @@ def _register_builtins() -> None:
         keywords=[
             "browse", "web", "webpage", "url", "fetch", "scrape",
             "snapshot", "click", "screenshot", "search", "brave",
-            "navigate", "website", "page", "html",
+            "navigate", "website", "page", "html", "cdp", "tab",
+            "form", "extract", "cookie", "stealth", "javascript",
         ],
         examples=[
             'action="fetch", url="https://example.com"',
             'action="search", query="latest AI news"',
             'action="snapshot", url="https://example.com"',
             'action="act", ref="e5", action_type="click"',
-            'action="screenshot", url="https://example.com"',
+            'action="connect", cdp_url="http://localhost:9222"',
+            'action="new_page", url="https://example.com"',
+            'action="fill_form", fields=[{"selector":"#email","value":"test@test.com"}]',
+            'action="extract", pattern="all_links"',
+            'action="stealth", stealth_level="balanced"',
+            'action="diagnose"',
         ],
         parameters=(
-            "action (fetch|browse|search|snapshot|act|screenshot), "
-            "url, query, ref, action_type (click|type|press|hover|select), "
-            "value, mode (headless|headful), search_provider (auto|brave|duckduckgo)"
+            "action (fetch|browse|search|snapshot|act|screenshot|connect|new_page|"
+            "list_pages|switch_page|close_page|get_logs|breadcrumbs|fill_form|wait|"
+            "extract|evaluate|handle_dialog|get_cookies|clear_cookies|stealth|diagnose), "
+            "url, query, ref, action_type, value, mode, session_id, page_id, cdp_url, "
+            "fields, pattern, script, stealth_level, log_filter, limit"
+        ),
+    ))
+
+    _registry.register(ToolEntry(
+        name="crypto",
+        kind="tool",
+        description=(
+            "Get cryptocurrency data: prices, market rankings, trending coins, "
+            "coin details, historical prices, and global market stats. "
+            "Free CoinGecko API, no API key required."
+        ),
+        category="finance",
+        factory="agent.tools.crypto:CryptoTool",
+        keywords=[
+            "crypto", "cryptocurrency", "bitcoin", "ethereum", "solana",
+            "coin", "token", "btc", "eth", "price", "market cap",
+            "trending", "coingecko",
+        ],
+        examples=[
+            "action='price', ids='bitcoin,ethereum'",
+            "action='markets', limit=10",
+            "action='trending'",
+            "action='detail', ids='bitcoin'",
+            "action='history', ids='bitcoin', days=30",
+            "action='global'",
+        ],
+        parameters=(
+            "action (price|markets|search|trending|detail|history|global), "
+            "ids, query, limit (1-100), days (1-365), currency (default: usd)"
+        ),
+    ))
+
+    _registry.register(ToolEntry(
+        name="currency",
+        kind="tool",
+        description=(
+            "Get currency exchange rates, convert amounts, and view historical rates. "
+            "Free Frankfurter API, no API key required. Supports all major currencies."
+        ),
+        category="finance",
+        factory="agent.tools.currency:CurrencyTool",
+        keywords=[
+            "currency", "exchange", "rate", "forex", "convert",
+            "dollar", "euro", "yen", "pound", "usd", "eur",
+            "gbp", "jpy", "fx",
+        ],
+        examples=[
+            "action='rates', base='USD', targets='EUR,GBP,JPY'",
+            "action='convert', base='USD', target='EUR', amount=100",
+            "action='history', base='USD', target='EUR', start_date='2024-01-01', end_date='2024-12-31'",
+            "action='list'",
+        ],
+        parameters=(
+            "action (rates|convert|history|list|multi), "
+            "base, target, targets, amount, start_date, end_date"
+        ),
+    ))
+
+    _registry.register(ToolEntry(
+        name="yahoo_finance",
+        kind="tool",
+        description=(
+            "Get stock market data: quotes, historical prices, company profiles, "
+            "and market indices. Uses Yahoo Finance, no API key required."
+        ),
+        category="finance",
+        factory="agent.tools.yahoo_finance:YahooFinanceTool",
+        keywords=[
+            "stock", "share", "equity", "quote", "ticker", "AAPL", "MSFT",
+            "GOOGL", "market", "index", "S&P", "Dow", "Nasdaq",
+            "historical", "company", "valuation", "dividend",
+        ],
+        examples=[
+            "action='quote', symbol='AAPL'",
+            "action='quotes', symbols='AAPL,MSFT,GOOGL'",
+            "action='historical', symbol='AAPL', period='3mo'",
+            "action='summary', symbol='AAPL'",
+            "action='market'",
+        ],
+        parameters=(
+            "action (quote|quotes|historical|search|summary|market), "
+            "symbol, symbols, query, period (1d-5y), interval (1d|1wk|1mo), limit"
+        ),
+    ))
+
+    _registry.register(ToolEntry(
+        name="gmail",
+        kind="tool",
+        description=(
+            "Manage Gmail: list, search, read, send, draft, and organize emails. "
+            "Requires Google OAuth2 setup (credentials.json)."
+        ),
+        category="email",
+        factory="agent.tools.gmail:GmailTool",
+        keywords=[
+            "email", "gmail", "inbox", "send", "mail", "message",
+            "draft", "unread", "compose", "reply",
+        ],
+        examples=[
+            "action='list', max_results=10",
+            "action='search', query='is:unread from:boss@company.com'",
+            "action='read', message_id='18abc123'",
+            "action='send', to='user@example.com', subject='Hello', body='Hi!'",
+            "action='draft', to='user@example.com', subject='Draft', body='...'",
+        ],
+        parameters=(
+            "action (list|search|read|send|draft|mark_read|delete|profile), "
+            "message_id, query, to, subject, body, max_results (1-50)"
         ),
     ))
 

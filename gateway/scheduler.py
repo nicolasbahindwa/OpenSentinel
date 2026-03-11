@@ -97,13 +97,13 @@ def _default_tasks() -> list[ScheduledTask]:
         ScheduledTask(
             name="system_health",
             prompt="Quick system health check — CPU, memory, disk. Only alert if something is critical.",
-            interval_minutes=int(os.getenv("OPENSENTINEL_HEALTH_INTERVAL", "60")),
+            interval_minutes=int(os.getenv("OPENSENTINEL_HEALTH_INTERVAL", "5")),
             enabled=False,
         ),
         ScheduledTask(
             name="news_check",
             prompt="Any breaking or important news in tech and finance in the last hour? Brief summary only.",
-            interval_minutes=int(os.getenv("OPENSENTINEL_NEWS_INTERVAL", "120")),
+            interval_minutes=int(os.getenv("OPENSENTINEL_NEWS_INTERVAL", "5")),
             enabled=False,
         ),
     ]
