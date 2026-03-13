@@ -164,6 +164,23 @@ def _register_builtins() -> None:
     ))
 
     _registry.register(ToolEntry(
+        name="followup_writer",
+        kind="tool",
+        description=(
+            "Clean and format follow-up questions for display by ensuring consistent "
+            "punctuation, spacing, and de-duplication."
+        ),
+        category="formatting",
+        factory="agent.tools.followup_writer:FollowupWriterTool",
+        keywords=["followup", "follow-up", "question", "format", "clean", "dedupe"],
+        examples=[
+            'questions=["Next steps", "More details?"]',
+            'questions=["1. clarify scope", "2) timeline?"], max_questions=3',
+        ],
+        parameters="questions (list[str]), max_questions (1-10, default 5)",
+    ))
+
+    _registry.register(ToolEntry(
         name="internet_search",
         kind="tool",
         description=(

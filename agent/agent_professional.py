@@ -20,6 +20,7 @@ from agent.config import Config
 from agent.logger import configure_logging, get_logger
 from agent.middleware import (
     GuardrailsMiddleware,
+    FollowupQuestionsMiddleware,
     ObservabilityMiddleware,
     RateLimitMiddleware,
     RoutingMiddleware,
@@ -142,6 +143,7 @@ def create_professional_agent(
             RateLimitMiddleware(max_requests=30, window_seconds=60),
             RoutingMiddleware(),
             ObservabilityMiddleware(),
+            FollowupQuestionsMiddleware(),
         ],
         backend=composite_backend(),
         memory=[str(Path(__file__).parent.parent / "AGENTS.md")],

@@ -20,7 +20,7 @@ from gateway.terminal import (
 )
 
 # ---------------------------------------------------------------------------
-# Tool name → friendly status label
+# Tool name ↁEfriendly status label
 # ---------------------------------------------------------------------------
 
 _TOOL_LABELS: dict[str, str] = {
@@ -37,7 +37,7 @@ _TOOL_LABELS: dict[str, str] = {
     "calculator":       "Calculating",
 }
 
-_SPINNER = itertools.cycle(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+_SPINNER = itertools.cycle(["⠁E, "⠁E, "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠁E, "⠁E])
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +98,26 @@ def _extract_ai_response(result: object) -> str | None:
             return msg["content"]
     return None
 
+def _extract_ai_response_from_state(state: object) -> str | None:
+    values = state.get("values", {}) if isinstance(state, dict) else {}
+    messages = values.get("messages", []) if isinstance(values, dict) else []
+    for msg in reversed(messages):
+        if msg.get("type") == "ai" and msg.get("content"):
+            return msg["content"]
+    return None
+
+
+def _extract_followups(result: object) -> list[str]:
+    if not isinstance(result, dict):
+        return []
+    if isinstance(result.get("followup_questions"), list):
+        return [str(q) for q in result["followup_questions"] if q]
+    values = result.get("values")
+    if isinstance(values, dict) and isinstance(values.get("followup_questions"), list):
+        return [str(q) for q in values["followup_questions"] if q]
+    return []
+
+
 
 # ---------------------------------------------------------------------------
 # Chat REPL
@@ -125,6 +145,7 @@ class ChatREPL:
         self.client = None
         self.thread_id: str | None = None
         self._streaming_supported = True   # set False after first streaming failure
+        self._followups: list[str] = []    # follow-up suggestions from last response
         self.scheduler = Scheduler(
             config=self.config,
             on_result=self._on_scheduled_result,
@@ -132,7 +153,7 @@ class ChatREPL:
         self._connect()
 
     # ------------------------------------------------------------------
-    # Scheduled task output — printed with a clear separator so it
+    # Scheduled task output  Eprinted with a clear separator so it
     # doesn't look like a response to the user's current input.
     # ------------------------------------------------------------------
 
@@ -170,7 +191,7 @@ class ChatREPL:
                     else:
                         print_error(f"Connection error: {e}")
                     return False
-                print_warn(f"Connection attempt {attempt} failed — retrying in {_RECONNECT_DELAY_SECONDS}s…")
+                print_warn(f"Connection attempt {attempt} failed  Eretrying in {_RECONNECT_DELAY_SECONDS}s…")
                 time.sleep(_RECONNECT_DELAY_SECONDS)
         return False
 
@@ -194,7 +215,7 @@ class ChatREPL:
         try:
             self._send_streaming(user_input)
         except Exception as e:
-            # Streaming failed — switch permanently to blocking mode.
+            # Streaming failed  Eswitch permanently to blocking mode.
             self._streaming_supported = False
             print_dim(f"(streaming unavailable: {e})")
             self._send_blocking(user_input)
@@ -207,7 +228,6 @@ class ChatREPL:
         """
         status = _StatusLine()
         response_lines: list[str] = []
-        response_started = False
 
         stream = self.client.runs.stream(
             thread_id=self.thread_id,
@@ -238,41 +258,35 @@ class ChatREPL:
                     elif ev == "on_chain_start" and name:
                         status.set_label(f"Running {name}")
 
-                # ── Streaming text chunks ──────────────────────────
+                # ── Streaming text chunks (buffered) ──────────────
                 elif part.event == "messages":
                     chunks = part.data if isinstance(part.data, list) else [part.data]
                     for chunk in chunks:
                         if not isinstance(chunk, dict):
                             continue
                         content = chunk.get("content", "")
-                        if not content:
-                            continue
-                        if not response_started:
-                            status.stop()
-                            response_started = True
-                        print(content, end="", flush=True)
-                        response_lines.append(content)
+                        if content:
+                            response_lines.append(content)
 
         finally:
             status.stop()
+        try:
+            state = self.client.threads.get_state(self.thread_id)
+            response = _extract_ai_response_from_state(state)
+            if response:
+                print(response)
+                self._show_followups_list(_extract_followups(state))
+                return
+        except Exception:
+            pass
 
         if response_lines:
-            print()  # final newline after streamed text
+            print("".join(response_lines))
         else:
-            # Streaming worked but no text chunks — extract from final state
-            try:
-                state = self.client.threads.get_state(self.thread_id)
-                msgs = state.get("values", {}).get("messages", [])
-                for msg in reversed(msgs):
-                    if msg.get("type") == "ai" and msg.get("content"):
-                        print(msg["content"])
-                        return
-            except Exception:
-                pass
             print_dim("(no response)")
 
     def _send_blocking(self, user_input: str) -> None:
-        """Blocking wait with animated spinner — fallback when streaming fails."""
+        """Blocking wait with animated spinner  Efallback when streaming fails."""
         status = _StatusLine()
         try:
             status.start()
@@ -284,7 +298,11 @@ class ChatREPL:
             status.stop()
 
             response = _extract_ai_response(result)
-            print(response if response else f"{DIM}(no response){RESET}")
+            if response:
+                print(response)
+                self._show_followups_list(_extract_followups(result))
+            else:
+                print(f"{DIM}(no response){RESET}")
 
         except KeyboardInterrupt:
             status.stop()
@@ -302,6 +320,20 @@ class ChatREPL:
                     print_error("Could not reconnect. Is 'langgraph dev' still running?")
             else:
                 print_error(f"Error: {e}")
+
+    # ------------------------------------------------------------------
+    # Follow-up suggestions
+    # ------------------------------------------------------------------
+
+    def _show_followups_list(self, followups: list[str]) -> None:
+        """Display extracted follow-up questions and store them for selection."""
+        self._followups = followups
+        if not followups:
+            return
+        print(f"\n{DIM}── Follow-up suggestions ─────────────────{RESET}")
+        for i, q in enumerate(followups, 1):
+            print(f"  {YELLOW}{i}.{RESET} {DIM}{q}{RESET}")
+        print()
 
     # ------------------------------------------------------------------
     # History
@@ -399,7 +431,7 @@ class ChatREPL:
             # Stop the background loop only if all tasks are now disabled
             if not any(t.enabled for t in self.scheduler.tasks):
                 self.scheduler.stop()
-                print_warn("All tasks disabled — scheduler stopped.")
+                print_warn("All tasks disabled  Escheduler stopped.")
             else:
                 print_warn(f"Disabled: {', '.join(changed)}")
             print(self.scheduler.status_table())
@@ -415,7 +447,7 @@ class ChatREPL:
                 self.scheduler.start()
             ok = self.scheduler.run_now(name)
             if ok:
-                print_ok(f"Task '{name}' triggered — response will appear shortly.")
+                print_ok(f"Task '{name}' triggered  Eresponse will appear shortly.")
             else:
                 print_error(f"Task '{name}' not found or scheduler cannot connect.")
             return
@@ -439,12 +471,12 @@ class ChatREPL:
                     print_warn(f"interval must be an integer, got {val!r}")
                     return
                 if self.scheduler.set_interval(name, mins):
-                    print_ok(f"'{name}' → every {mins}m")
+                    print_ok(f"'{name}' ↁEevery {mins}m")
                 else:
                     print_error(f"Task '{name}' not found.")
             elif key == "at":
                 if self.scheduler.set_time(name, val):
-                    print_ok(f"'{name}' → daily at {val}")
+                    print_ok(f"'{name}' ↁEdaily at {val}")
                 else:
                     print_error(f"Invalid time '{val}' or task not found. Use HH:MM format.")
             else:
@@ -493,6 +525,14 @@ class ChatREPL:
                     break
                 continue
 
+            # Allow selecting a follow-up suggestion by number
+            if user_input.isdigit() and self._followups:
+                idx = int(user_input) - 1
+                if 0 <= idx < len(self._followups):
+                    user_input = self._followups[idx]
+                    print(f"{DIM}  ↁE{user_input}{RESET}")
+
+            self._followups = []  # clear after each send
             print(f"{CYAN}{BOLD}Agent > {RESET}", end="", flush=True)
             self._send(user_input)
 
@@ -515,3 +555,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
