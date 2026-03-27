@@ -11,7 +11,6 @@ from .weather import WeatherLookupTool
 from .internet_search import TavilySearchTool
 from .file_browser import FileBrowserTool
 from .tool_search import ToolSearchTool
-from .followup_writer import FollowupWriterTool
 from .system_monitoring import SystemStatusTool
 from .web_browser import WebBrowserTool
 from .crypto import CryptoTool
@@ -29,7 +28,6 @@ __all__ = [
     "WeatherLookupTool",
     "FileBrowserTool",
     "ToolSearchTool",
-    "FollowupWriterTool",
     "SystemStatusTool",
     "WebBrowserTool",
     "CryptoTool",

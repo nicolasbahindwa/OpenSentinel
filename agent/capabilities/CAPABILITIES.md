@@ -42,6 +42,7 @@ Keep startup prompts concise and read this file only when deeper guidance is nee
 
 Skill metadata is discovered from `/skills/`.
 Read a specific `SKILL.md` only when the task requires that workflow.
+`mood-skill` is also used as the policy reference for always-on response-style middleware.
 
 ## Middleware
 
@@ -49,9 +50,11 @@ Read a specific `SKILL.md` only when the task requires that workflow.
 - Rate-limit middleware: throttles request volume per identity/time window.
 - Routing middleware: applies intent-aware tool ordering and delegation hints.
 - Observability middleware: logs route decisions and latency metrics.
+- Response-style middleware: injects a concise per-turn tone and language hint based on the latest user message.
 - Memory middleware: loads configured memory files once per session.
 - Skills middleware: injects skill catalog and enables progressive disclosure.
 - Filesystem middleware: provides file operations within tool-enforced allowlists.
+- Follow-up middleware: extracts or synthesizes concise next-question suggestions for the UI.
 
 ## Memory
 

@@ -1,122 +1,32 @@
 """Interactive CLI gateway for OpenSentinel.
 
 Usage:
-    python -m gateway
     python -m gateway.cli
 """
 
 from __future__ import annotations
 
-import itertools
+import os
 import sys
-import threading
-import time
 
 from gateway.config import GatewayConfig
 from gateway.scheduler import Scheduler
-from gateway.terminal import (
-    RESET, BOLD, DIM, GREEN, CYAN, YELLOW, RED, MAGENTA,
-    banner, print_error, print_warn, print_ok, print_dim,
-)
+from gateway.terminal import safe_print
 
 # ---------------------------------------------------------------------------
-# Tool name ↁEfriendly status label
+# ANSI colours (no extra deps)
 # ---------------------------------------------------------------------------
+RESET = "\033[0m"
+BOLD = "\033[1m"
+DIM = "\033[2m"
+GREEN = "\033[32m"
+CYAN = "\033[36m"
+YELLOW = "\033[33m"
+RED = "\033[31m"
 
-_TOOL_LABELS: dict[str, str] = {
-    "web_browser":      "Browsing the web",
-    "internet_search":  "Searching the web",
-    "crypto":           "Fetching crypto data",
-    "currency":         "Fetching exchange rates",
-    "yahoo_finance":    "Fetching market data",
-    "gmail":            "Accessing Gmail",
-    "file_manager":     "Reading files",
-    "code_executor":    "Running code",
-    "system_monitor":   "Checking system",
-    "memory":           "Accessing memory",
-    "calculator":       "Calculating",
-}
-
-_SPINNER = itertools.cycle(["⠁E, "⠁E, "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠁E, "⠁E])
-
-
-# ---------------------------------------------------------------------------
-# Animated status line (used during blocking wait)
-# ---------------------------------------------------------------------------
-
-class _StatusLine:
-    """Prints an animated spinner with a status message while the agent runs."""
-
-    def __init__(self) -> None:
-        self._stop = threading.Event()
-        self._label = "Thinking"
-        self._lock = threading.Lock()
-        self._thread: threading.Thread | None = None
-
-    def set_label(self, label: str) -> None:
-        with self._lock:
-            self._label = label
-
-    def start(self) -> None:
-        self._stop.clear()
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
-
-    def stop(self) -> None:
-        self._stop.set()
-        if self._thread:
-            self._thread.join(timeout=2)
-        # Erase spinner line
-        print("\r" + " " * 60 + "\r", end="", flush=True)
-
-    def _run(self) -> None:
-        start = time.monotonic()
-        while not self._stop.is_set():
-            elapsed = int(time.monotonic() - start)
-            with self._lock:
-                label = self._label
-            spin = next(_SPINNER)
-            print(
-                f"\r{DIM}{spin} {label}… ({elapsed}s){RESET}   ",
-                end="", flush=True,
-            )
-            time.sleep(0.1)
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-_MAX_RECONNECT_ATTEMPTS = 5
-_RECONNECT_DELAY_SECONDS = 3
-
-
-def _extract_ai_response(result: object) -> str | None:
-    """Pull the last AI message content out of a LangGraph run result."""
-    messages = result.get("messages", []) if isinstance(result, dict) else []
-    for msg in reversed(messages):
-        if msg.get("type") == "ai" and msg.get("content"):
-            return msg["content"]
-    return None
-
-def _extract_ai_response_from_state(state: object) -> str | None:
-    values = state.get("values", {}) if isinstance(state, dict) else {}
-    messages = values.get("messages", []) if isinstance(values, dict) else []
-    for msg in reversed(messages):
-        if msg.get("type") == "ai" and msg.get("content"):
-            return msg["content"]
-    return None
-
-
-def _extract_followups(result: object) -> list[str]:
-    if not isinstance(result, dict):
-        return []
-    if isinstance(result.get("followup_questions"), list):
-        return [str(q) for q in result["followup_questions"] if q]
-    values = result.get("values")
-    if isinstance(values, dict) and isinstance(values.get("followup_questions"), list):
-        return [str(q) for q in values["followup_questions"] if q]
-    return []
-
+# Enable ANSI on Windows cmd.exe
+if sys.platform == "win32":
+    os.system("")
 
 
 # ---------------------------------------------------------------------------
@@ -125,389 +35,192 @@ def _extract_followups(result: object) -> list[str]:
 
 
 class ChatREPL:
-    """Terminal REPL that communicates with the LangGraph dev server."""
+    """Terminal REPL that streams responses from the LangGraph dev server."""
 
     COMMANDS = {
-        "/quit, /exit":         "Exit the CLI",
-        "/new":                 "Start a new conversation thread",
-        "/history":             "Show message history for the current thread",
-        "/schedule":            "Show scheduler status",
-        "/schedule on [name]":  "Enable all tasks (or one by name) and start",
-        "/schedule off [name]": "Disable all tasks (or one by name) and stop",
-        "/schedule run <name>": "Trigger a task immediately",
-        "/schedule set <name> interval=<mins> | at=<HH:MM>": "Change a task's schedule",
-        "/schedule history":    "Show recent scheduled task outputs",
-        "/help":                "Show this help",
+        "/quit": "Exit the CLI",
+        "/exit": "Exit the CLI",
+        "/new": "Start a new conversation thread",
+        "/history": "Show message history for the current thread",
+        "/schedule": "Manage scheduled tasks (on/off/status)",
+        "/help": "Show available commands",
     }
 
     def __init__(self) -> None:
         self.config = GatewayConfig()
         self.client = None
         self.thread_id: str | None = None
-        self._streaming_supported = True   # set False after first streaming failure
-        self._followups: list[str] = []    # follow-up suggestions from last response
-        self.scheduler = Scheduler(
-            config=self.config,
-            on_result=self._on_scheduled_result,
-        )
+        self.scheduler = Scheduler(config=self.config)
         self._connect()
 
     # ------------------------------------------------------------------
-    # Scheduled task output  Eprinted with a clear separator so it
-    # doesn't look like a response to the user's current input.
+    # Connection & thread management
     # ------------------------------------------------------------------
 
-    def _on_scheduled_result(self, result) -> None:
-        colour = RED if result.error else CYAN
-        print(f"\n{MAGENTA}{BOLD}[{result.timestamp} · scheduled: {result.task_name}]{RESET}")
-        print(f"{colour}{result.response}{RESET}")
-        # Re-print the prompt so the user knows where to type
-        print(f"{GREEN}{BOLD}You > {RESET}", end="", flush=True)
+    def _connect(self) -> None:
+        """Connect to the LangGraph dev server."""
+        try:
+            from langgraph_sdk import get_sync_client
 
-    # ------------------------------------------------------------------
-    # Connection & reconnect
-    # ------------------------------------------------------------------
+            self.client = get_sync_client(url=self.config.url)
+            # Quick health check — list assistants
+            self.client.assistants.search(limit=1)
+            self._new_thread()
+        except Exception as e:
+            err = str(e)
+            if "Connect" in err or "refused" in err or "Failed" in err:
+                print(
+                    f"\n{RED}Cannot connect to LangGraph server at {self.config.url}{RESET}"
+                    f"\n{DIM}Is 'langgraph dev' running?{RESET}"
+                    f"\n{YELLOW}Tip: Use 'python -m gateway.cli_standalone' to run without server{RESET}\n"
+                )
+            else:
+                print(f"\n{RED}Connection error: {e}{RESET}\n")
+            sys.exit(1)
 
-    def _connect(self, quiet: bool = False) -> bool:
-        """Connect (or reconnect) to the LangGraph server."""
-        for attempt in range(1, _MAX_RECONNECT_ATTEMPTS + 1):
-            try:
-                from langgraph_sdk import get_sync_client
-                self.client = get_sync_client(url=self.config.url)
-                self.client.assistants.search(limit=1)
-                if not self.thread_id:
-                    self._new_thread(announce=not quiet)
-                if not quiet:
-                    print_ok(f"Connected to {self.config.url}")
-                return True
-            except Exception as e:
-                err = str(e)
-                if attempt == _MAX_RECONNECT_ATTEMPTS:
-                    if "Connect" in err or "refused" in err or "Failed" in err:
-                        print_error(
-                            f"Cannot connect to LangGraph server at {self.config.url}\n"
-                            f"Is 'langgraph dev' running?"
-                        )
-                    else:
-                        print_error(f"Connection error: {e}")
-                    return False
-                print_warn(f"Connection attempt {attempt} failed  Eretrying in {_RECONNECT_DELAY_SECONDS}s…")
-                time.sleep(_RECONNECT_DELAY_SECONDS)
-        return False
-
-    def _new_thread(self, announce: bool = True) -> None:
-        """Create a fresh conversation thread and share it with the scheduler."""
+    def _new_thread(self) -> None:
+        """Create a fresh conversation thread."""
         thread = self.client.threads.create()
         self.thread_id = thread["thread_id"]
-        self.scheduler.set_thread(self.thread_id)
-        if announce:
-            print_dim(f"Thread: {self.thread_id}")
+        safe_print(f"{DIM}Thread: {self.thread_id}{RESET}")
 
     # ------------------------------------------------------------------
-    # Sending messages
+    # Sending messages & streaming
     # ------------------------------------------------------------------
 
     def _send(self, user_input: str) -> None:
-        """Send a message, streaming events for live status, fallback to wait."""
-        if not self._streaming_supported:
-            self._send_blocking(user_input)
-            return
-        try:
-            self._send_streaming(user_input)
-        except Exception as e:
-            # Streaming failed  Eswitch permanently to blocking mode.
-            self._streaming_supported = False
-            print_dim(f"(streaming unavailable: {e})")
-            self._send_blocking(user_input)
+        """Send a message and wait for the response.
 
-    def _send_streaming(self, user_input: str) -> None:
-        """Stream the run and display tool calls + response as they arrive.
-
-        Any exception raised here (including stream setup failures) propagates
-        to _send(), which immediately falls back to _send_blocking().
+        Uses runs.wait() because langgraph dev (in-memory mode) does not
+        support streaming reliably (BlockingError).  When deployed to
+        LangGraph Cloud, this can be swapped to runs.stream().
         """
-        status = _StatusLine()
-        response_lines: list[str] = []
-
-        stream = self.client.runs.stream(
-            thread_id=self.thread_id,
-            assistant_id=self.config.assistant_id,
-            input={"messages": [{"role": "user", "content": user_input}]},
-            stream_mode="messages",
-        )
-
-        status.start()
         try:
-            for part in stream:
-                # ── Tool / node events ─────────────────────────────
-                if part.event == "events":
-                    data = part.data or {}
-                    ev = data.get("event", "")
-                    name = data.get("name", "")
-
-                    if ev == "on_tool_start":
-                        label = _TOOL_LABELS.get(name, f"Using {name}")
-                        status.set_label(label)
-
-                    elif ev == "on_tool_end":
-                        status.set_label("Processing result")
-
-                    elif ev == "on_chat_model_start":
-                        status.set_label("Composing response")
-
-                    elif ev == "on_chain_start" and name:
-                        status.set_label(f"Running {name}")
-
-                # ── Streaming text chunks (buffered) ──────────────
-                elif part.event == "messages":
-                    chunks = part.data if isinstance(part.data, list) else [part.data]
-                    for chunk in chunks:
-                        if not isinstance(chunk, dict):
-                            continue
-                        content = chunk.get("content", "")
-                        if content:
-                            response_lines.append(content)
-
-        finally:
-            status.stop()
-        try:
-            state = self.client.threads.get_state(self.thread_id)
-            response = _extract_ai_response_from_state(state)
-            if response:
-                print(response)
-                self._show_followups_list(_extract_followups(state))
-                return
-        except Exception:
-            pass
-
-        if response_lines:
-            print("".join(response_lines))
-        else:
-            print_dim("(no response)")
-
-    def _send_blocking(self, user_input: str) -> None:
-        """Blocking wait with animated spinner  Efallback when streaming fails."""
-        status = _StatusLine()
-        try:
-            status.start()
+            safe_print(f"{DIM}(thinking...){RESET}", end="\r", flush=True)
             result = self.client.runs.wait(
                 thread_id=self.thread_id,
                 assistant_id=self.config.assistant_id,
                 input={"messages": [{"role": "user", "content": user_input}]},
+                timeout=180.0,  # 3 minute timeout (reduced from 5 to catch issues faster)
             )
-            status.stop()
+            # Clear the "thinking..." line
+            safe_print(" " * 30, end="\r", flush=True)
 
-            response = _extract_ai_response(result)
-            if response:
-                print(response)
-                self._show_followups_list(_extract_followups(result))
-            else:
-                print(f"{DIM}(no response){RESET}")
-
+            # Extract the last AI message from the result
+            messages = result.get("messages", []) if isinstance(result, dict) else []
+            for msg in reversed(messages):
+                if msg.get("type") == "ai" and msg.get("content"):
+                    safe_print(msg["content"])
+                    return
+            safe_print(f"{DIM}(no response){RESET}")
         except KeyboardInterrupt:
-            status.stop()
-            print(f"\n{DIM}(interrupted){RESET}")
+            safe_print(f"\n{DIM}(interrupted){RESET}")
         except Exception as e:
-            status.stop()
             err = str(e)
             if "timeout" in err.lower():
-                print_warn("Response timed out. The agent may still be processing.")
-            elif "Connect" in err or "refused" in err:
-                print_warn("Lost connection. Attempting to reconnect…")
-                if self._connect(quiet=True):
-                    print_ok("Reconnected. Please resend your message.")
-                else:
-                    print_error("Could not reconnect. Is 'langgraph dev' still running?")
+                safe_print(f"\n{YELLOW}Response timed out. The agent may still be processing.{RESET}")
             else:
-                print_error(f"Error: {e}")
-
-    # ------------------------------------------------------------------
-    # Follow-up suggestions
-    # ------------------------------------------------------------------
-
-    def _show_followups_list(self, followups: list[str]) -> None:
-        """Display extracted follow-up questions and store them for selection."""
-        self._followups = followups
-        if not followups:
-            return
-        print(f"\n{DIM}── Follow-up suggestions ─────────────────{RESET}")
-        for i, q in enumerate(followups, 1):
-            print(f"  {YELLOW}{i}.{RESET} {DIM}{q}{RESET}")
-        print()
+                safe_print(f"\n{RED}Error: {e}{RESET}")
 
     # ------------------------------------------------------------------
     # History
     # ------------------------------------------------------------------
 
     def _show_history(self) -> None:
+        """Print the conversation history for the current thread."""
         try:
             state = self.client.threads.get_state(self.thread_id)
             messages = state.get("values", {}).get("messages", [])
             if not messages:
-                print_dim("(no messages yet)")
+                safe_print(f"{DIM}(no messages yet){RESET}")
                 return
 
-            print(f"\n{BOLD}── Conversation History ──────────────────{RESET}")
+            safe_print(f"\n{BOLD}--- Conversation History ---{RESET}")
             for msg in messages:
                 role = msg.get("type", "unknown")
                 content = msg.get("content", "")
                 if role == "human":
-                    print(f"  {GREEN}You:{RESET}   {content}")
+                    safe_print(f"  {GREEN}You:{RESET} {content}")
                 elif role == "ai":
                     if content:
-                        preview = content[:200] + ("…" if len(content) > 200 else "")
-                        print(f"  {CYAN}Agent:{RESET} {preview}")
-                    for tc in msg.get("tool_calls", []):
-                        print(f"  {DIM}         [tool: {tc.get('name', '?')}]{RESET}")
+                        safe_print(f"  {CYAN}Agent:{RESET} {content[:200]}{'...' if len(content) > 200 else ''}")
+                    tool_calls = msg.get("tool_calls", [])
+                    for tc in tool_calls:
+                        safe_print(f"  {DIM}  [tool: {tc.get('name', '?')}]{RESET}")
                 elif role == "tool":
-                    print(f"  {DIM}         [{msg.get('name', 'tool')} result]{RESET}")
-            print(f"{BOLD}──────────────────────────────────────────{RESET}\n")
+                    name = msg.get("name", "tool")
+                    safe_print(f"  {DIM}  [{name} result]{RESET}")
+            safe_print(f"{BOLD}----------------------------{RESET}\n")
         except Exception as e:
-            print_error(f"Could not fetch history: {e}")
+            safe_print(f"{RED}Could not fetch history: {e}{RESET}")
 
     # ------------------------------------------------------------------
-    # Command dispatch
+    # Command handling
     # ------------------------------------------------------------------
 
     def _handle_command(self, cmd: str) -> bool:
-        """Handle a slash command. Returns False to exit."""
-        parts = cmd.strip().split()
-        root = parts[0].lower()
+        """Handle a slash command. Returns False to signal exit."""
+        cmd = cmd.strip().lower()
 
-        if root in ("/quit", "/exit"):
+        if cmd in ("/quit", "/exit"):
             return False
 
-        if root == "/new":
+        if cmd == "/new":
             self._new_thread()
-            print_ok("New conversation started.")
+            print(f"{GREEN}New conversation started.{RESET}")
             return True
 
-        if root == "/history":
+        if cmd == "/history":
             self._show_history()
             return True
 
-        if root == "/schedule":
-            self._handle_schedule(parts[1:])
+        if cmd.startswith("/schedule"):
+            self._handle_schedule(cmd)
             return True
 
-        if root == "/help":
+        if cmd == "/help":
             print(f"\n{BOLD}Commands:{RESET}")
             for name, desc in self.COMMANDS.items():
-                print(f"  {YELLOW}{name}{RESET}")
-                print(f"      {DIM}{desc}{RESET}")
+                print(f"  {YELLOW}{name:12}{RESET} {desc}")
             print()
             return True
 
-        print_dim(f"Unknown command: {root}. Type /help for options.")
+        print(f"{DIM}Unknown command: {cmd}. Type /help for options.{RESET}")
         return True
 
     # ------------------------------------------------------------------
-    # /schedule subcommands
+    # Scheduler
     # ------------------------------------------------------------------
 
-    def _handle_schedule(self, args: list[str]) -> None:
-        sub = args[0].lower() if args else ""
+    def _handle_schedule(self, cmd: str) -> None:
+        """Handle /schedule subcommands."""
+        parts = cmd.strip().split()
+        sub = parts[1] if len(parts) > 1 else ""
 
-        # ── /schedule on [name] ──────────────────────────────────────
         if sub == "on":
-            name = args[1] if len(args) > 1 else None
-            changed = self.scheduler.enable(name)
-            if not changed:
-                print_warn(f"Task '{name}' not found. Run /schedule to list tasks.")
-                return
-            if not self.scheduler.running:
-                self.scheduler.start()
-            print_ok(f"Enabled: {', '.join(changed)}")
+            self.scheduler.enable_all()
+            self.scheduler.start()
+            print(f"{YELLOW}Scheduler started.{RESET}")
             print(self.scheduler.status_table())
-            return
-
-        # ── /schedule off [name] ─────────────────────────────────────
-        if sub == "off":
-            name = args[1] if len(args) > 1 else None
-            changed = self.scheduler.disable(name)
-            if not changed:
-                print_warn(f"Task '{name}' not found.")
-                return
-            # Stop the background loop only if all tasks are now disabled
-            if not any(t.enabled for t in self.scheduler.tasks):
-                self.scheduler.stop()
-                print_warn("All tasks disabled  Escheduler stopped.")
-            else:
-                print_warn(f"Disabled: {', '.join(changed)}")
+        elif sub == "off":
+            self.scheduler.disable_all()
+            self.scheduler.stop()
+            print(f"{YELLOW}Scheduler stopped.{RESET}")
+        else:
+            # Show status
+            state = "RUNNING" if self.scheduler.running else "STOPPED"
+            print(f"\n{BOLD}Scheduler: {state}{RESET}")
             print(self.scheduler.status_table())
-            return
-
-        # ── /schedule run <name> ──────────────────────────────────────
-        if sub == "run":
-            if len(args) < 2:
-                print_warn("Usage: /schedule run <task_name>")
-                return
-            name = args[1]
-            if not self.scheduler.running:
-                self.scheduler.start()
-            ok = self.scheduler.run_now(name)
-            if ok:
-                print_ok(f"Task '{name}' triggered  Eresponse will appear shortly.")
-            else:
-                print_error(f"Task '{name}' not found or scheduler cannot connect.")
-            return
-
-        # ── /schedule set <name> interval=<N> | at=<HH:MM> ──────────
-        if sub == "set":
-            # e.g.  /schedule set news_check interval=30
-            #        /schedule set daily_briefing at=09:00
-            if len(args) < 3:
-                print_warn("Usage: /schedule set <name> interval=<mins>  OR  at=<HH:MM>")
-                return
-            name, setting = args[1], args[2]
-            if "=" not in setting:
-                print_warn("Setting must be  interval=<mins>  or  at=<HH:MM>")
-                return
-            key, val = setting.split("=", 1)
-            if key == "interval":
-                try:
-                    mins = int(val)
-                except ValueError:
-                    print_warn(f"interval must be an integer, got {val!r}")
-                    return
-                if self.scheduler.set_interval(name, mins):
-                    print_ok(f"'{name}' ↁEevery {mins}m")
-                else:
-                    print_error(f"Task '{name}' not found.")
-            elif key == "at":
-                if self.scheduler.set_time(name, val):
-                    print_ok(f"'{name}' ↁEdaily at {val}")
-                else:
-                    print_error(f"Invalid time '{val}' or task not found. Use HH:MM format.")
-            else:
-                print_warn(f"Unknown setting '{key}'. Use 'interval' or 'at'.")
-            return
-
-        # ── /schedule history ─────────────────────────────────────────
-        if sub == "history":
-            print(f"\n{BOLD}── Scheduled Task History ────────────────{RESET}")
-            print(self.scheduler.history_table())
-            print()
-            return
-
-        # ── /schedule  (status) ───────────────────────────────────────
-        state = f"{GREEN}RUNNING{RESET}" if self.scheduler.running else f"{DIM}STOPPED{RESET}"
-        print(f"\n{BOLD}Scheduler:{RESET} {state}")
-        print(self.scheduler.status_table())
-        print(
-            f"\n{DIM}"
-            f"/schedule on [name]  /schedule off [name]  "
-            f"/schedule run <name>  /schedule set <name> interval=<N> | at=<HH:MM>"
-            f"{RESET}\n"
-        )
+            print(f"\n{DIM}Usage: /schedule on | /schedule off{RESET}\n")
 
     # ------------------------------------------------------------------
-    # Main REPL loop
+    # Main loop
     # ------------------------------------------------------------------
 
     def run(self) -> None:
-        print(f"\n{banner('OpenSentinel CLI', CYAN)}")
-        print_dim(f"Connected to {self.config.url}  ·  Type /help for commands\n")
+        """Start the interactive REPL."""
+        print(f"\n{BOLD}{CYAN}OpenSentinel CLI{RESET}")
+        print(f"{DIM}Connected to {self.config.url} | Type /help for commands{RESET}\n")
 
         while True:
             try:
@@ -521,21 +234,14 @@ class ChatREPL:
 
             if user_input.startswith("/"):
                 if not self._handle_command(user_input):
-                    print_dim("Goodbye!")
+                    print(f"{DIM}Goodbye!{RESET}")
                     break
                 continue
 
-            # Allow selecting a follow-up suggestion by number
-            if user_input.isdigit() and self._followups:
-                idx = int(user_input) - 1
-                if 0 <= idx < len(self._followups):
-                    user_input = self._followups[idx]
-                    print(f"{DIM}  ↁE{user_input}{RESET}")
-
-            self._followups = []  # clear after each send
             print(f"{CYAN}{BOLD}Agent > {RESET}", end="", flush=True)
             self._send(user_input)
 
+        # Cleanup
         if self.scheduler.running:
             self.scheduler.stop()
 
@@ -546,14 +252,9 @@ class ChatREPL:
 
 
 def main() -> None:
-    if sys.version_info < (3, 11):
-        print_error("Python 3.11+ required.")
-        sys.exit(1)
     repl = ChatREPL()
     repl.run()
 
 
 if __name__ == "__main__":
     main()
-
-

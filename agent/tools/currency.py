@@ -6,6 +6,7 @@ No API key required.
 
 import asyncio
 import json
+from concurrent.futures import ThreadPoolExecutor
 from typing import ClassVar, Type
 
 import httpx
@@ -255,6 +256,13 @@ class CurrencyTool(BaseTool):
         start_date: str = "",
         end_date: str = "",
     ) -> str:
-        return asyncio.get_event_loop().run_until_complete(
-            self._arun(action, base, target, targets, amount, start_date, end_date)
-        )
+        coro = self._arun(action, base, target, targets, amount, start_date, end_date)
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(coro)
+
+        # If a loop is already running in this thread, run the coroutine in a
+        # dedicated worker thread so the sync tool interface still completes.
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            return executor.submit(asyncio.run, coro).result()

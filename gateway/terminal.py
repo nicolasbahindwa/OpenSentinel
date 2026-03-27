@@ -29,24 +29,34 @@ if sys.platform == "win32":
 # Helpers
 # ---------------------------------------------------------------------------
 
+def safe_print(*parts: object, sep: str = " ", end: str = "\n", flush: bool = False) -> None:
+    text = sep.join(str(part) for part in parts)
+    try:
+        print(text, end=end, flush=flush)
+    except UnicodeEncodeError:
+        encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+        safe_text = text.encode(encoding, errors="replace").decode(encoding, errors="replace")
+        print(safe_text, end=end, flush=flush)
+
+
 def print_error(msg: str) -> None:
-    print(f"{RED}{msg}{RESET}")
+    safe_print(f"{RED}{msg}{RESET}")
 
 
 def print_warn(msg: str) -> None:
-    print(f"{YELLOW}{msg}{RESET}")
+    safe_print(f"{YELLOW}{msg}{RESET}")
 
 
 def print_ok(msg: str) -> None:
-    print(f"{GREEN}{msg}{RESET}")
+    safe_print(f"{GREEN}{msg}{RESET}")
 
 
 def print_dim(msg: str) -> None:
-    print(f"{DIM}{msg}{RESET}")
+    safe_print(f"{DIM}{msg}{RESET}")
 
 
 def print_section(title: str) -> None:
-    print(f"\n{BOLD}{title}{RESET}")
+    safe_print(f"\n{BOLD}{title}{RESET}")
 
 
 def banner(text: str, colour: str = CYAN) -> str:

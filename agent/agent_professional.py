@@ -22,7 +22,9 @@ from agent.middleware import (
     GuardrailsMiddleware,
     FollowupQuestionsMiddleware,
     ObservabilityMiddleware,
+    ProviderRetryMiddleware,
     RateLimitMiddleware,
+    ResponseStyleMiddleware,
     RoutingMiddleware,
 )
 from agent.prompt.loader import get_full_prompt
@@ -112,7 +114,6 @@ def get_selected_subagents(
 logger = get_logger("agent.agent", component="agent")
 
 
-@lru_cache(maxsize=1)
 def create_professional_agent(
     tool_names: Optional[tuple[str, ...]] = None,
     subagent_names: Optional[tuple[str, ...]] = None,
@@ -120,9 +121,10 @@ def create_professional_agent(
     """
     Create a professional OpenSentinel agent.
 
-    Agent graph creation is deferred and cached: this runs only on first call.
+    NOTE: Cache temporarily removed to allow hot-reloading during development.
+    Agent graph is created fresh on each call.
     """
-    configure_logging(json_output=True, log_level="INFO")
+    configure_logging(json_output=False, log_level="DEBUG")  # Pretty colored output + DEBUG level
     logger.info("creating_agent", tools=tool_names, subagents=subagent_names)
 
     configurable = Config.from_runnable_config()
@@ -131,7 +133,7 @@ def create_professional_agent(
     subagents = get_selected_subagents(configurable.subagent_model, subagent_names)
 
     # create_deep_agent adds built-in middleware for memory/skills/filesystem.
-    return create_deep_agent(
+    agent = create_deep_agent(
         model=configurable.base_model,
         name="OPENSENTINEL_PROFESSIONAL",
         system_prompt=get_full_prompt(),
@@ -140,15 +142,22 @@ def create_professional_agent(
         skills=list(SKILL_SOURCES),
         middleware=[
             GuardrailsMiddleware(judge_model=configurable.judge_model),
+            ProviderRetryMiddleware(
+                max_attempts=configurable.provider_retry_attempts,
+                base_delay_seconds=configurable.provider_retry_base_delay_seconds,
+            ),
             RateLimitMiddleware(max_requests=30, window_seconds=60),
             RoutingMiddleware(),
+            ResponseStyleMiddleware(),
+
             ObservabilityMiddleware(),
             FollowupQuestionsMiddleware(),
         ],
         backend=composite_backend(),
         memory=[str(Path(__file__).parent.parent / "AGENTS.md")],
-        debug=True,
+        debug=True,  # Enable full LangGraph debug output for troubleshooting
     )
+    return agent.with_config({"recursion_limit": configurable.recursion_limit})
 
 
 def create_agent() -> CompiledStateGraph:

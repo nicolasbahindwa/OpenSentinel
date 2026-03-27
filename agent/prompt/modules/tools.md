@@ -55,9 +55,56 @@ Actions:
 - Provide `ref` from a previous snapshot when using `act`.
 - Set `mode="headful"` only when explicitly needed (default is headless).
 
+## `crypto`
+
+Get cryptocurrency data from CoinGecko (free, no API key).
+Actions:
+- `price` — get current prices for coins (provide `ids` like "bitcoin,ethereum")
+- `markets` — get top coins by market cap (set `limit`)
+- `trending` — get currently trending coins
+- `detail` — get detailed info for a coin
+- `history` — get historical prices (provide `ids` and `days`)
+- `global` — get global crypto market stats
+
+## `currency`
+
+Get currency exchange rates from Frankfurter API (free, no API key).
+Actions:
+- `rates` — get current exchange rates (provide `base` and `targets` like "EUR,GBP,JPY")
+- `convert` — convert an amount between currencies
+- `history` — get historical rates (provide `start_date` and `end_date`)
+- `list` — list all available currencies
+
+## `yahoo_finance`
+
+Get stock market data from Yahoo Finance (free, no API key).
+Actions:
+- `quote` — get quote for a single stock (provide `symbol` like "AAPL")
+- `quotes` — get quotes for multiple stocks (provide `symbols` like "AAPL,MSFT,GOOGL")
+- `historical` — get historical prices (provide `symbol` and `period` like "3mo")
+- `summary` — get company profile and financials
+- `market` — get market indices overview
+
+## `gmail`
+
+Manage Gmail (requires OAuth2 setup with credentials.json).
+Actions:
+- `list` — list recent emails
+- `search` — search emails by query (e.g., "is:unread from:boss@company.com")
+- `read` — read an email by message_id
+- `send` — send an email (provide `to`, `subject`, `body`)
+- `draft` — create a draft email
+- `mark_read` — mark email as read
+- `delete` — delete an email
+
 ## Tool Policy
 
-- When unsure which tool to use, call `tool_search` first to discover capabilities.
-- Prefer direct tool usage for factual questions.
-- Include source links when returning externally sourced information.
-- If a tool fails, report the failure and provide the safest fallback.
+- **When unsure which tool to use**, call `tool_search` first to discover capabilities.
+- **For news/briefings**: Use `internet_search` for simple news queries, or delegate to `news_curator` or `morning_briefing` subagents via the `task` tool for curated briefings.
+- **Prefer direct tool usage** for factual questions (weather, currency, stocks).
+- **MAKE PARALLEL TOOL CALLS** when you need multiple independent pieces of information (weather + currency + news → call all at once).
+- **Include REAL source citations** when returning externally sourced information:
+  - Extract actual source from tool output (website name, API name, company)
+  - ❌ WRONG: `(Source: internet_search)` or `(Source: weather_lookup)`
+  - ✅ CORRECT: `(Source: BBC News)` or `(Source: Open-Meteo API)`
+- **If a tool fails**, report the failure and provide the safest fallback. For rate limit errors (429), suggest trying again later or using an alternative tool.

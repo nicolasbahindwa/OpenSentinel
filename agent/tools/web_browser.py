@@ -61,7 +61,7 @@ class BrowserMode(Enum):
     HEADFUL = "headful"
 
 
-class SecurityLevel(Enum):
+class SecurityLevel(str, Enum):
     STRICT = "strict"
     STANDARD = "standard"
     RELAXED = "relaxed"
@@ -1140,7 +1140,7 @@ class WebBrowserTool(BaseTool):
 
     # Pydantic fields (declared so BaseTool / Pydantic v2 accepts them)
     allowed_domains: Optional[set] = None
-    security_level: str = "relaxed"
+    security_level: SecurityLevel = SecurityLevel.RELAXED
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
     max_retries: int = 2
     rate_limit: int = DEFAULT_RATE_LIMIT

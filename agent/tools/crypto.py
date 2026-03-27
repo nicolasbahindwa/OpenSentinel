@@ -325,6 +325,19 @@ class CryptoTool(BaseTool):
         days: int = 30,
         currency: str = "usd",
     ) -> str:
-        return asyncio.get_event_loop().run_until_complete(
-            self._arun(action, ids, query, limit, days, currency)
-        )
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                return pool.submit(
+                    asyncio.run,
+                    self._arun(action, ids, query, limit, days, currency),
+                ).result()
+        else:
+            return asyncio.run(
+                self._arun(action, ids, query, limit, days, currency)
+            )
